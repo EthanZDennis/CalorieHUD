@@ -11,25 +11,32 @@
     
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .brand { font-size: 24px; font-weight: 800; color: #1e1b4b; }
+    
+    /* Tabs */
     .tabs { display: flex; gap: 8px; background: #e0e7ff; padding: 4px; border-radius: 12px; margin-bottom: 20px; }
     .tab { flex: 1; text-align: center; padding: 10px; border-radius: 10px; font-weight: 600; color: #6366f1; cursor: pointer; transition: all 0.2s; }
     .tab.active { background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: #1e1b4b; }
 
+    /* Cards */
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
     .card { background: var(--card); padding: 15px; border-radius: 20px; box-shadow: 0 4px 15px -2px rgba(0,0,0,0.05); }
     .card-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
     .card-value { font-size: 24px; font-weight: 800; }
     .unit { font-size: 14px; color: #94a3b8; font-weight: 600; }
-    .chart-container { background: white; padding: 15px; border-radius: 20px; height: 200px; margin-bottom: 20px; }
+    
+    /* The Super Chart */
+    .chart-container { background: white; padding: 10px; border-radius: 20px; height: 260px; margin-bottom: 20px; position: relative; }
 
+    /* Inputs */
     input, select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 16px; box-sizing: border-box; margin-bottom: 10px; }
     .btn { background: var(--primary); color: white; width: 100%; padding: 15px; border-radius: 14px; font-size: 16px; font-weight: 700; border: none; cursor: pointer; }
     
+    /* Toggle Switch */
     .mode-switch { display: flex; gap: 10px; margin-bottom: 20px; }
     .mode-btn { flex: 1; padding: 10px; border-radius: 10px; background: #f1f5f9; text-align: center; font-weight: 600; font-size: 14px; cursor: pointer; }
     .mode-btn.active { background: #cbd5e1; color: #0f172a; }
 
-    /* History List with Delete */
+    /* Lists */
     .history-section { margin-top: 30px; }
     .history-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; align-items: center; }
     .history-left { display: flex; flex-direction: column; }
@@ -39,12 +46,13 @@
     .cals-badge { font-weight: 700; color: #0f172a; }
     .delete-btn { color: #cbd5e1; cursor: pointer; padding: 5px; }
     .delete-btn:hover { color: var(--danger); }
-
     .hidden { display: none; }
   </style>
 </head>
 <body onload="init()">
+
   <div class="header"><div class="brand">CalorieHUD 2.0</div></div>
+
   <div class="tabs">
     <div id="tabHusband" class="tab active" onclick="setUser('husband')">🇺🇸 Husband</div>
     <div id="tabWife" class="tab" onclick="setUser('wife')">🇯🇵 Wife</div>
@@ -90,7 +98,8 @@
   <div id="modeManual" class="hidden">
     <div class="card">
       <div class="card-label">Log Past Meal?</div>
-      <input type="date" id="mDate" style="margin-bottom: 15px;"> <input type="text" id="mItem" placeholder="Food Name (Optional)">
+      <input type="date" id="mDate" style="margin-bottom: 15px;">
+      
       <select id="mCategory">
         <option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option><option>Protein Shake</option>
       </select>
@@ -103,18 +112,18 @@
   </div>
 
   <div class="history-section">
-    <div class="card-label" style="margin-bottom: 10px;">Last 7 Days</div>
-    <div class="chart-container"><canvas id="historyChart"></canvas></div>
+    <div class="card-label" style="margin-bottom: 10px;">30-Day Performance</div>
+    <div class="chart-container"><canvas id="comboChart"></canvas></div>
+
     <div class="card-label" style="margin-bottom: 10px;">Recent History</div>
     <div id="historyList"></div>
   </div>
 
   <script>
     let currentUser = 'husband';
-    let myChart = null;
+    let comboChart = null;
 
     function init() { 
-      // Set Date Picker to Today by default
       document.getElementById('mDate').valueAsDate = new Date();
       loadStats(); 
     }
@@ -147,6 +156,7 @@
       const pct = Math.min(100, (data.totalCals / goal) * 100);
       document.getElementById('progressBar').style.width = pct + '%';
 
+      // Update History List
       const list = document.getElementById('historyList');
       list.innerHTML = data.recentLogs.map(l => {
         const dateStr = new Date(l.timestamp).toLocaleDateString();
@@ -163,49 +173,105 @@
         </div>`;
       }).join('');
 
-      updateChart(data.chartData);
+      // Build Combined Chart
+      updateComboChart(data.chartData, data.weightHistory);
+    }
+
+    // --- THE COMBO CHART ENGINE ---
+    function updateComboChart(calsData, weightData) {
+      const ctx = document.getElementById('comboChart').getContext('2d');
+      if (comboChart) comboChart.destroy();
+
+      // Align weight data to the same 30-day labels
+      const labels = calsData.labels; // Last 30 days
+      
+      // Create a sparse array for weight (null where no weight recorded)
+      const weightValues = labels.map(label => {
+        // Find a weight entry that matches this date label (MM/DD)
+        const match = weightData.find(w => {
+           const d = new Date(w.x);
+           const wLabel = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+           // Check if it matches roughly (ignoring timezone drift)
+           return wLabel === label;
+        });
+        return match ? match.y : null; 
+      });
+
+      comboChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              type: 'line',
+              label: 'Weight',
+              data: weightValues,
+              borderColor: '#10b981', // Green Line
+              borderWidth: 3,
+              pointRadius: 3,
+              spanGaps: true, // Connect lines across empty days
+              yAxisID: 'y1',
+              tension: 0.2
+            },
+            {
+              type: 'bar',
+              label: 'Calories',
+              data: calsData.values,
+              backgroundColor: 'rgba(79, 70, 229, 0.6)', // Blue Bars
+              borderRadius: 2,
+              yAxisID: 'y'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: true, position: 'bottom' } },
+          scales: {
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 6 } }, // Show fewer dates to save space
+            y: { 
+              beginAtZero: true, 
+              position: 'left',
+              grid: { display: false } 
+            },
+            y1: { 
+              type: 'linear',
+              position: 'right',
+              min: 100, // Adjust min/max for weight scale visually
+              grid: { display: false }
+            }
+          }
+        }
+      });
     }
 
     async function deleteLog(id) {
       if(!confirm("Delete this entry?")) return;
-      await fetch(`/api/log/${id}`, { 
-        method: 'DELETE',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: currentUser }) 
-      });
+      await fetch(`/api/log/${id}`, { method: 'DELETE', headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: currentUser }) });
       loadStats();
     }
 
     async function submitManual() {
-      const item = document.getElementById('mItem').value;
+      // No Item Name anymore
+      const cat = document.getElementById('mCategory').value;
       const cals = document.getElementById('mCals').value;
       const prot = document.getElementById('mProt').value;
-      const cat = document.getElementById('mCategory').value;
       const date = document.getElementById('mDate').value;
+      
+      // Auto-generate name: "Manual [Category]"
+      const item = "Manual " + cat;
 
       await fetch("/api/log/manual", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: currentUser, item, calories: cals, protein: prot, category: cat, date: date })
+        body: JSON.stringify({ user: currentUser, item: item, calories: cals, protein: prot, category: cat, date: date })
       });
 
-      document.getElementById('mItem').value = "";
       document.getElementById('mCals').value = "";
       document.getElementById('mProt').value = "";
-      document.getElementById('mDate').valueAsDate = new Date(); // Reset to today
+      document.getElementById('mDate').valueAsDate = new Date();
       loadStats();
-      setMode('photo');
-    }
-
-    // ... (Keep existing updateChart, uploadPhoto, shrinkImage, submitWeight functions) ...
-    function updateChart(chartData) {
-      const ctx = document.getElementById('historyChart').getContext('2d');
-      if (myChart) myChart.destroy();
-      myChart = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: chartData.labels, datasets: [{ label: 'Calories', data: chartData.values, backgroundColor: '#4f46e5', borderRadius: 4 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false } } } }
-      });
+      setMode('photo'); // Switch back
     }
 
     async function submitWeight() {
@@ -220,18 +286,14 @@
       if (!file) return;
       const btn = document.getElementById('photoBtn');
       const status = document.getElementById('status');
-      btn.innerText = "Analyzing...";
-      status.innerText = "⏳ Sending to AI...";
+      btn.innerText = "Analyzing..."; status.innerText = "⏳ Sending to AI...";
       const resizedBlob = await shrinkImage(file);
-      const formData = new FormData();
-      formData.append("image", resizedBlob);
-      formData.append("user", currentUser);
+      const formData = new FormData(); formData.append("image", resizedBlob); formData.append("user", currentUser);
       try {
         const res = await fetch("/api/log/photo", { method: "POST", body: formData });
         const data = await res.json();
         if(data.error) throw new Error(data.error);
-        status.innerText = "✅ Added!";
-        loadStats();
+        status.innerText = "✅ Added!"; loadStats();
       } catch (e) { status.innerText = "❌ " + e.message; }
       finally { btn.innerText = "Take Photo"; document.getElementById('fileInput').value = ""; }
     }
