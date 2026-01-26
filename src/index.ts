@@ -17,14 +17,12 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // --- ROUTES ---
 
-// 1. GET DATA
 app.get("/api/stats", async (req, res) => {
   const user = (req.query.user as 'husband' | 'wife') || 'husband';
   const data = await db.getStats(user);
   res.json(data);
 });
 
-// 2. LOG PHOTO (AI)
 app.post("/api/log/photo", upload.single("image"), async (req: any, res: any) => {
   try {
     const user = req.body.user || 'husband';
@@ -41,44 +39,43 @@ app.post("/api/log/photo", upload.single("image"), async (req: any, res: any) =>
       id: Date.now().toString(),
       date: new Date().toISOString(),
       timestamp: Date.now(),
-      user,
-      ...aiData
+      user, ...aiData
     };
     await db.addLog(entry);
     res.json(entry);
   } catch (error: any) { res.status(500).json({ error: error.message }); }
 });
 
-// 3. LOG MANUAL (Flexible Fields)
 app.post("/api/log/manual", async (req, res) => {
   try {
     const { user, item, calories, protein, category } = req.body;
-    
-    // Default values if fields are blank
     const entry = {
       id: Date.now().toString(),
       date: new Date().toISOString(),
       timestamp: Date.now(),
       user, 
-      item: item || "Manual Entry", // Default name if blank
-      calories: Number(calories) || 0, // 0 if blank
-      protein: Number(protein) || 0,   // 0 if blank
+      item: item || "Manual Entry",
+      calories: Number(calories) || 0,
+      protein: Number(protein) || 0,
       category: category || "Snack"
     };
-    
     await db.addLog(entry);
     res.json(entry);
   } catch (error: any) { res.status(500).json({ error: error.message }); }
 });
 
-// 4. WEIGHT
 app.post("/api/weight", async (req, res) => {
   try {
     const { user, weight } = req.body;
-    await db.addWeight({ date: new Date().toISOString(), user: user, weight: Number(weight) });
+    await db.addWeight({ date: new Date().toISOString(), user, weight: Number(weight) });
     res.json({ success: true });
   } catch (error: any) { res.status(500).json({ error: error.message }); }
 });
 
+// --- START SERVER ---
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+
+// Initialize DB then start listening
+db.init().then(() => {
+  app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+});
