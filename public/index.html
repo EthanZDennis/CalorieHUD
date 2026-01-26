@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CalorieHUD</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
   <style>
     :root { --primary: #4f46e5; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --danger: #ef4444; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; -webkit-tap-highlight-color: transparent; }
@@ -117,7 +117,6 @@
     let comboChart = null;
 
     function init() { 
-      // Initialize with Hawaii Time
       updateDatePicker('Pacific/Honolulu');
       loadStats(); 
     }
@@ -127,18 +126,16 @@
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.getElementById(user === 'husband' ? 'tabHusband' : 'tabWife').classList.add('active');
       document.getElementById('goalDisplay').innerText = user === 'husband' ? '4000' : '2000';
-      
-      // Auto-switch Date Picker Timezone
       const tz = user === 'husband' ? 'Pacific/Honolulu' : 'Asia/Tokyo';
       updateDatePicker(tz);
-
       loadStats();
     }
 
     function updateDatePicker(timeZone) {
-      // Get the current date in the specific timezone
-      const dateStr = new Date().toLocaleDateString("en-CA", { timeZone: timeZone });
-      document.getElementById('mDate').value = dateStr;
+      try {
+        const dateStr = new Date().toLocaleDateString("en-CA", { timeZone: timeZone });
+        document.getElementById('mDate').value = dateStr;
+      } catch (e) { document.getElementById('mDate').valueAsDate = new Date(); }
     }
 
     function setMode(mode) {
@@ -151,53 +148,75 @@
     function toggleWeight() { document.getElementById('weightInputArea').classList.toggle('hidden'); }
 
     async function loadStats() {
-      const res = await fetch(`/api/stats?user=${currentUser}`);
-      const data = await res.json();
-      
-      document.getElementById('consumedDisplay').innerText = data.totalCals;
-      document.getElementById('weightDisplay').innerText = data.lastWeight || '--';
-      
-      const goal = currentUser === 'husband' ? 4000 : 2000;
-      const pct = Math.min(100, (data.totalCals / goal) * 100);
-      document.getElementById('progressBar').style.width = pct + '%';
+      try {
+        const res = await fetch(`/api/stats?user=${currentUser}`);
+        const data = await res.json();
+        
+        document.getElementById('consumedDisplay').innerText = data.totalCals;
+        document.getElementById('weightDisplay').innerText = data.lastWeight || '--';
+        
+        const goal = currentUser === 'husband' ? 4000 : 2000;
+        const pct = Math.min(100, (data.totalCals / goal) * 100);
+        document.getElementById('progressBar').style.width = pct + '%';
 
-      const list = document.getElementById('historyList');
-      list.innerHTML = data.recentLogs.map(l => {
-        const dateStr = new Date(l.timestamp).toLocaleDateString();
-        return `
-        <div class="history-item">
-          <div class="history-left">
-            <span class="history-name">${l.item}</span>
-            <span class="history-meta">${dateStr} • ${l.category}</span>
-          </div>
-          <div class="history-right">
-            <div class="cals-badge">${l.calories}</div>
-            <div class="delete-btn" onclick="deleteLog('${l.id}')">🗑️</div>
-          </div>
-        </div>`;
-      }).join('');
+        const list = document.getElementById('historyList');
+        if (data.recentLogs && data.recentLogs.length > 0) {
+          list.innerHTML = data.recentLogs.map(l => {
+            const dateStr = new Date(l.timestamp).toLocaleDateString();
+            return `
+            <div class="history-item">
+              <div class="history-left">
+                <span class="history-name">${l.item}</span>
+                <span class="history-meta">${dateStr} • ${l.category}</span>
+              </div>
+              <div class="history-right">
+                <div class="cals-badge">${l.calories}</div>
+                <div class="delete-btn" onclick="deleteLog('${l.id}')">🗑️</div>
+              </div>
+            </div>`;
+          }).join('');
+        } else {
+          list.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8">No history found.</div>';
+        }
 
-      updateComboChart(data.chartData, data.weightHistory);
+        // SAFETY: Only try to build chart if library loaded
+        if (typeof Chart !== 'undefined') {
+          updateComboChart(data.chartData, data.weightHistory || []);
+        } else {
+          console.error("Chart.js failed to load.");
+        }
+      } catch (e) { console.error("Load Stats Error:", e); }
     }
 
     function updateComboChart(calsData, weightData) {
       const ctx = document.getElementById('comboChart').getContext('2d');
       if (comboChart) comboChart.destroy();
 
-      const weightValues = calsData.labels.map(label => {
-        const match = weightData.find(w => {
-           const parts = w.x.split('-'); 
-           const d = new Date(parts[0], parts[1]-1, parts[2]); 
-           const wLabel = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
-           return wLabel === label;
+      // SAFETY: Generate labels safely
+      const labels = calsData.labels || [];
+      
+      // SAFETY: Map weight data safely. If it errors, return nulls (empty line) instead of crashing
+      let weightValues = [];
+      try {
+        weightValues = labels.map(label => {
+          const match = weightData.find(w => {
+            // Normalize dates to strings for comparison to avoid timezone math errors
+            // Label format is usually "Jan 1"
+            // Weight format "2026-01-01"
+            if (!w.x) return false;
+            const parts = w.x.split('-'); 
+            const d = new Date(parts[0], parts[1]-1, parts[2]); // Construct safe date
+            const wLabel = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+            return wLabel === label;
+          });
+          return match ? match.y : null;
         });
-        return match ? match.y : null;
-      });
+      } catch (e) { console.error("Weight map error", e); weightValues = new Array(labels.length).fill(null); }
 
       comboChart = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: calsData.labels,
+          labels: labels,
           datasets: [
             {
               type: 'line',
@@ -208,7 +227,7 @@
               borderWidth: 3,
               pointRadius: 3,
               spanGaps: true,
-              yAxisID: 'y1',
+              yAxisID: 'y1', // Explicitly link to Right Axis
               tension: 0.2
             },
             {
@@ -217,7 +236,7 @@
               data: calsData.values,
               backgroundColor: 'rgba(79, 70, 229, 0.6)',
               borderRadius: 4,
-              yAxisID: 'y'
+              yAxisID: 'y' // Explicitly link to Left Axis
             }
           ]
         },
@@ -230,13 +249,18 @@
             y: { 
               beginAtZero: true, 
               position: 'left',
-              grid: { display: false } 
+              grid: { display: false },
+              title: { display: false }
             },
             y1: { 
-              type: 'linear',
+              type: 'linear', // MUST BE LINEAR for line chart
               position: 'right',
-              min: 90, // Adjusted lower bound for wife/husband range
-              grid: { display: false }
+              grid: { display: false },
+              // Smart min/max to keep line in middle
+              min: function(context) {
+                  const values = context.chart.data.datasets[0].data.filter(v => v !== null);
+                  return values.length > 0 ? Math.min(...values) - 5 : 0;
+              }
             }
           }
         }
@@ -257,11 +281,8 @@
       const item = "Manual " + cat;
       await fetch("/api/log/manual", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: currentUser, item, calories: cals, protein: prot, category: cat, date: date }) });
       document.getElementById('mCals').value = ""; document.getElementById('mProt').value = ""; 
-      
-      // Reset Date Picker to correct timezone
       const tz = currentUser === 'husband' ? 'Pacific/Honolulu' : 'Asia/Tokyo';
       updateDatePicker(tz);
-
       loadStats(); setMode('photo');
     }
 
