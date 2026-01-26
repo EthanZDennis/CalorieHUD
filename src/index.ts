@@ -11,8 +11,8 @@ const upload = multer({
 });
 
 // --- CONFIGURATION ---
-// Validated Model from your list:
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+// Using the validated model from your list
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // --- THE WEBSITE UI ---
@@ -51,7 +51,6 @@ const HTML_UI = `
     #fileInput { display: none; }
     #status { margin-top: 12px; font-size: 14px; font-weight: 600; color: #64748b; min-height: 20px; }
     
-    /* Loading Spinner */
     .spinner { display: inline-block; width: 16px; height: 16px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 1s ease-in-out infinite; margin-right: 8px; display: none; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
@@ -100,11 +99,9 @@ const HTML_UI = `
       const fileInput = document.getElementById('fileInput');
       const status = document.getElementById('status');
       const btn = document.getElementById('btnLabel');
-      const spinner = document.getElementById('spinner');
-
+      
       if (!fileInput.files[0]) return;
 
-      // Update UI for Loading
       const originalText = btn.innerHTML;
       btn.innerHTML = '<div class="spinner" style="display:inline-block"></div> Analyzing...';
       btn.style.opacity = "0.8";
@@ -115,7 +112,6 @@ const HTML_UI = `
       formData.append("image", fileInput.files[0]);
 
       try {
-        // 30 Second Timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -130,7 +126,6 @@ const HTML_UI = `
         
         if (data.error) throw new Error(data.error);
 
-        // Success UI
         status.innerText = "✅ " + data.food + " added!";
         status.style.color = "#16a34a";
         
@@ -146,10 +141,9 @@ const HTML_UI = `
         }
         status.style.color = "#dc2626";
       } finally {
-        // Reset Button
         btn.innerHTML = '📸 Add Meal Photo';
         btn.style.opacity = "1";
-        fileInput.value = ""; // Clear input so you can re-upload same photo
+        fileInput.value = "";
       }
     }
 
@@ -169,13 +163,13 @@ app.post("/log", upload.single("image"), async (req: any, res: any) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No photo" });
 
-    // 1. Optimize (600px is the sweet spot for speed vs accuracy)
+    // Optimize
     const optimizedBuffer = await sharp(req.file.buffer)
       .resize(600) 
       .jpeg({ quality: 50 })
       .toBuffer();
 
-    // 2. Prompt (Using the correct 2.5 Flash model)
+    // Gemini 2.5 Prompt
     const prompt = `
       Identify food. Estimate calories/protein. 
       CRITICAL: Hardgainer bulk -> err on lower side (subtract 15%).
@@ -188,7 +182,8 @@ app.post("/log", upload.single("image"), async (req: any, res: any) => {
     ]);
 
     const text = result.response.text();
-    const cleanJson = text.replace(/\\\`\\\`\\\`json|\\\`\\\`\\\`/g, "").trim();
+    // CLEAN FIX: Removed markdown artifacts here
+    const cleanJson = text.replace(/```json|```/g, "").trim();
     
     res.json(JSON.parse(cleanJson));
 
@@ -199,4 +194,4 @@ app.post("/log", upload.single("image"), async (req: any, res: any) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(\`Server running on \${PORT}\`));
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
