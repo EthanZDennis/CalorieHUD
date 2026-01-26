@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CalorieHUD</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
   <style>
     :root { --primary: #4f46e5; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --danger: #ef4444; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; -webkit-tap-highlight-color: transparent; }
@@ -12,31 +12,25 @@
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .brand { font-size: 24px; font-weight: 800; color: #1e1b4b; }
     
-    /* Tabs */
     .tabs { display: flex; gap: 8px; background: #e0e7ff; padding: 4px; border-radius: 12px; margin-bottom: 20px; }
     .tab { flex: 1; text-align: center; padding: 10px; border-radius: 10px; font-weight: 600; color: #6366f1; cursor: pointer; transition: all 0.2s; }
     .tab.active { background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: #1e1b4b; }
 
-    /* Cards */
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
     .card { background: var(--card); padding: 15px; border-radius: 20px; box-shadow: 0 4px 15px -2px rgba(0,0,0,0.05); }
     .card-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
     .card-value { font-size: 24px; font-weight: 800; }
     .unit { font-size: 14px; color: #94a3b8; font-weight: 600; }
     
-    /* The Super Chart */
     .chart-container { background: white; padding: 10px; border-radius: 20px; height: 260px; margin-bottom: 20px; position: relative; }
 
-    /* Inputs */
     input, select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 16px; box-sizing: border-box; margin-bottom: 10px; }
     .btn { background: var(--primary); color: white; width: 100%; padding: 15px; border-radius: 14px; font-size: 16px; font-weight: 700; border: none; cursor: pointer; }
     
-    /* Toggle Switch */
     .mode-switch { display: flex; gap: 10px; margin-bottom: 20px; }
     .mode-btn { flex: 1; padding: 10px; border-radius: 10px; background: #f1f5f9; text-align: center; font-weight: 600; font-size: 14px; cursor: pointer; }
     .mode-btn.active { background: #cbd5e1; color: #0f172a; }
 
-    /* Lists */
     .history-section { margin-top: 30px; }
     .history-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; align-items: center; }
     .history-left { display: flex; flex-direction: column; }
@@ -99,7 +93,6 @@
     <div class="card">
       <div class="card-label">Log Past Meal?</div>
       <input type="date" id="mDate" style="margin-bottom: 15px;">
-      
       <select id="mCategory">
         <option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option><option>Protein Shake</option>
       </select>
@@ -156,7 +149,6 @@
       const pct = Math.min(100, (data.totalCals / goal) * 100);
       document.getElementById('progressBar').style.width = pct + '%';
 
-      // Update History List
       const list = document.getElementById('historyList');
       list.innerHTML = data.recentLogs.map(l => {
         const dateStr = new Date(l.timestamp).toLocaleDateString();
@@ -173,43 +165,41 @@
         </div>`;
       }).join('');
 
-      // Build Combined Chart
       updateComboChart(data.chartData, data.weightHistory);
     }
 
-    // --- THE COMBO CHART ENGINE ---
+    // --- FIXED CHART LOGIC ---
     function updateComboChart(calsData, weightData) {
       const ctx = document.getElementById('comboChart').getContext('2d');
       if (comboChart) comboChart.destroy();
 
-      // Align weight data to the same 30-day labels
-      const labels = calsData.labels; // Last 30 days
-      
-      // Create a sparse array for weight (null where no weight recorded)
-      const weightValues = labels.map(label => {
-        // Find a weight entry that matches this date label (MM/DD)
+      // Fix: Align dates manually (ignoring timezones) to ensure matching
+      // calsData.labels = ["Jan 1", "Jan 2", ...]
+      const weightValues = calsData.labels.map(label => {
         const match = weightData.find(w => {
-           const d = new Date(w.x);
+           // w.x is "2026-01-26". We need to turn that into "Jan 26" to match the chart label
+           const parts = w.x.split('-'); 
+           const d = new Date(parts[0], parts[1]-1, parts[2]); // Construct safe date
            const wLabel = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
-           // Check if it matches roughly (ignoring timezone drift)
            return wLabel === label;
         });
-        return match ? match.y : null; 
+        return match ? match.y : null;
       });
 
       comboChart = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: labels,
+          labels: calsData.labels,
           datasets: [
             {
               type: 'line',
               label: 'Weight',
               data: weightValues,
-              borderColor: '#10b981', // Green Line
+              borderColor: '#10b981',
+              backgroundColor: '#10b981',
               borderWidth: 3,
               pointRadius: 3,
-              spanGaps: true, // Connect lines across empty days
+              spanGaps: true,
               yAxisID: 'y1',
               tension: 0.2
             },
@@ -217,8 +207,8 @@
               type: 'bar',
               label: 'Calories',
               data: calsData.values,
-              backgroundColor: 'rgba(79, 70, 229, 0.6)', // Blue Bars
-              borderRadius: 2,
+              backgroundColor: 'rgba(79, 70, 229, 0.6)',
+              borderRadius: 4,
               yAxisID: 'y'
             }
           ]
@@ -228,7 +218,7 @@
           maintainAspectRatio: false,
           plugins: { legend: { display: true, position: 'bottom' } },
           scales: {
-            x: { grid: { display: false }, ticks: { maxTicksLimit: 6 } }, // Show fewer dates to save space
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 6 } }, 
             y: { 
               beginAtZero: true, 
               position: 'left',
@@ -237,7 +227,7 @@
             y1: { 
               type: 'linear',
               position: 'right',
-              min: 100, // Adjust min/max for weight scale visually
+              min: 130, // Optimized for your weight range
               grid: { display: false }
             }
           }
@@ -252,26 +242,14 @@
     }
 
     async function submitManual() {
-      // No Item Name anymore
       const cat = document.getElementById('mCategory').value;
       const cals = document.getElementById('mCals').value;
       const prot = document.getElementById('mProt').value;
       const date = document.getElementById('mDate').value;
-      
-      // Auto-generate name: "Manual [Category]"
       const item = "Manual " + cat;
-
-      await fetch("/api/log/manual", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: currentUser, item: item, calories: cals, protein: prot, category: cat, date: date })
-      });
-
-      document.getElementById('mCals').value = "";
-      document.getElementById('mProt').value = "";
-      document.getElementById('mDate').valueAsDate = new Date();
-      loadStats();
-      setMode('photo'); // Switch back
+      await fetch("/api/log/manual", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: currentUser, item, calories: cals, protein: prot, category: cat, date: date }) });
+      document.getElementById('mCals').value = ""; document.getElementById('mProt').value = ""; document.getElementById('mDate').valueAsDate = new Date();
+      loadStats(); setMode('photo');
     }
 
     async function submitWeight() {
