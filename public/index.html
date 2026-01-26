@@ -3,31 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CalorieHUD 2.0</title>
+  <title>CalorieHUD</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root { --primary: #4f46e5; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; -webkit-tap-highlight-color: transparent; }
     
-    /* Header & Tabs */
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .brand { font-size: 24px; font-weight: 800; color: #1e1b4b; }
     .tabs { display: flex; gap: 8px; background: #e0e7ff; padding: 4px; border-radius: 12px; margin-bottom: 20px; }
     .tab { flex: 1; text-align: center; padding: 10px; border-radius: 10px; font-weight: 600; color: #6366f1; cursor: pointer; transition: all 0.2s; }
     .tab.active { background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: #1e1b4b; }
 
-    /* Dashboard */
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
     .card { background: var(--card); padding: 15px; border-radius: 20px; box-shadow: 0 4px 15px -2px rgba(0,0,0,0.05); }
     .card-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
     .card-value { font-size: 24px; font-weight: 800; }
     .unit { font-size: 14px; color: #94a3b8; font-weight: 600; }
 
-    /* Forms & Inputs */
-    .input-group { margin-bottom: 15px; }
-    input, select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 16px; box-sizing: border-box; }
+    /* Chart Container */
+    .chart-container { background: white; padding: 15px; border-radius: 20px; height: 200px; margin-bottom: 20px; }
+
+    /* Forms */
+    input, select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 16px; box-sizing: border-box; margin-bottom: 10px; }
     .btn { background: var(--primary); color: white; width: 100%; padding: 15px; border-radius: 14px; font-size: 16px; font-weight: 700; border: none; cursor: pointer; }
-    .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); margin-top: 10px; }
     
     /* Modes */
     .mode-switch { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -35,21 +34,21 @@
     .mode-btn.active { background: #cbd5e1; color: #0f172a; }
 
     /* History List */
-    .history-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+    .history-section { margin-top: 30px; }
+    .history-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; align-items: center; }
     .history-left { display: flex; flex-direction: column; }
     .history-name { font-weight: 600; font-size: 15px; }
     .history-meta { font-size: 12px; color: #64748b; }
-    .history-cals { font-weight: 700; color: var(--primary); }
+    .history-right { text-align: right; }
+    .cals-badge { font-weight: 700; color: #0f172a; }
+    .prot-badge { font-size: 12px; color: #6366f1; font-weight: 600; }
 
-    /* Hidden Sections */
     .hidden { display: none; }
-    #spinner { display: inline-block; width: 16px; height: 16px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 1s infinite; margin-right: 8px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body onload="init()">
 
-  <div class="header"><div class="brand">CalorieHUD</div></div>
+  <div class="header"><div class="brand">CalorieHUD 2.0</div></div>
 
   <div class="tabs">
     <div id="tabHusband" class="tab active" onclick="setUser('husband')">🇺🇸 Husband</div>
@@ -61,16 +60,14 @@
       <div class="card-label">Daily Goal</div>
       <div class="card-value" id="goalDisplay">4000</div>
     </div>
-    <div class="card" onclick="toggleWeightForm()">
+    <div class="card" onclick="toggleWeight()">
       <div class="card-label">Weight ✏️</div>
       <div class="card-value"><span id="weightDisplay">--</span> <span class="unit">lbs</span></div>
     </div>
   </div>
 
-  <div id="weightForm" class="card hidden" style="margin-bottom: 20px;">
-    <div class="input-group">
-      <input type="number" id="newWeight" placeholder="Enter weight (lbs)">
-    </div>
+  <div id="weightInputArea" class="card hidden" style="margin-bottom: 20px;">
+    <input type="number" id="newWeight" placeholder="New Weight (lbs)">
     <button class="btn" onclick="submitWeight()">Update Weight</button>
   </div>
 
@@ -97,28 +94,33 @@
 
   <div id="modeManual" class="hidden">
     <div class="card">
-      <div class="input-group"><input type="text" id="mItem" placeholder="Food Name (e.g. 2 Eggs)"></div>
-      <div class="input-group">
-        <select id="mCategory">
-          <option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option><option>Protein Shake</option>
-        </select>
-      </div>
+      <div style="margin-bottom: 10px; font-size: 12px; color: #64748b;">All fields are optional</div>
+      <input type="text" id="mItem" placeholder="Food Name (Optional)">
+      <select id="mCategory">
+        <option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option><option>Protein Shake</option>
+      </select>
       <div class="grid" style="margin-bottom:0">
-        <input type="number" id="mCals" placeholder="Calories">
-        <input type="number" id="mProt" placeholder="Protein (g)">
+        <input type="number" id="mCals" placeholder="Calories (Optional)">
+        <input type="number" id="mProt" placeholder="Protein (Optional)">
       </div>
       <button class="btn" style="margin-top:15px;" onclick="submitManual()">Log Meal</button>
     </div>
   </div>
 
-  <div style="margin-top: 30px;">
-    <div class="card-label" style="margin-bottom: 10px;">Today's Log</div>
+  <div class="history-section">
+    <div class="card-label" style="margin-bottom: 10px;">Last 7 Days</div>
+    <div class="chart-container">
+      <canvas id="historyChart"></canvas>
+    </div>
+
+    <div class="card-label" style="margin-bottom: 10px;">Recent History</div>
     <div id="historyList"></div>
   </div>
 
   <script>
     let currentUser = 'husband';
-    
+    let myChart = null;
+
     function init() { loadStats(); }
 
     function setUser(user) {
@@ -136,66 +138,66 @@
       document.getElementById('btnModeManual').classList.toggle('active', mode === 'manual');
     }
 
-    function toggleWeightForm() {
-      document.getElementById('weightForm').classList.toggle('hidden');
-    }
+    function toggleWeight() { document.getElementById('weightInputArea').classList.toggle('hidden'); }
 
     async function loadStats() {
       const res = await fetch(`/api/stats?user=${currentUser}`);
       const data = await res.json();
       
+      // Update Top Stats
       document.getElementById('consumedDisplay').innerText = data.totalCals;
       document.getElementById('weightDisplay').innerText = data.lastWeight || '--';
       
-      // Update Bar
       const goal = currentUser === 'husband' ? 4000 : 2000;
       const pct = Math.min(100, (data.totalCals / goal) * 100);
       document.getElementById('progressBar').style.width = pct + '%';
 
       // Update List
       const list = document.getElementById('historyList');
-      list.innerHTML = data.todayLogs.map(l => `
+      list.innerHTML = data.recentLogs.map(l => {
+        const dateStr = new Date(l.timestamp).toLocaleDateString();
+        return `
         <div class="history-item">
           <div class="history-left">
             <span class="history-name">${l.item}</span>
-            <span class="history-meta">${l.category} • ${l.protein}g Prot</span>
+            <span class="history-meta">${dateStr} • ${l.category}</span>
           </div>
-          <div class="history-cals">${l.calories}</div>
-        </div>
-      `).join('');
+          <div class="history-right">
+            <div class="cals-badge">${l.calories} kcal</div>
+            <div class="prot-badge">${l.protein}g Prot</div>
+          </div>
+        </div>`;
+      }).join('');
+
+      // Update Chart
+      updateChart(data.chartData);
     }
 
-    // --- ACTIONS ---
-
-    async function uploadPhoto() {
-      const file = document.getElementById('fileInput').files[0];
-      if (!file) return;
-
-      const btn = document.getElementById('photoBtn');
-      const status = document.getElementById('status');
+    function updateChart(chartData) {
+      const ctx = document.getElementById('historyChart').getContext('2d');
+      if (myChart) myChart.destroy();
       
-      btn.innerHTML = '<div id="spinner"></div> Analyzing...';
-      status.innerText = "⏳ Compressing & Sending...";
-
-      // Client-side Resize (reused from before)
-      const resizedBlob = await shrinkImage(file);
-      const formData = new FormData();
-      formData.append("image", resizedBlob);
-      formData.append("user", currentUser);
-
-      try {
-        const res = await fetch("/api/log/photo", { method: "POST", body: formData });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        status.innerText = `✅ Added: ${data.item}`;
-        loadStats();
-      } catch (e) {
-        status.innerText = "❌ " + e.message;
-      } finally {
-        btn.innerHTML = "Take Photo";
-        document.getElementById('fileInput').value = "";
-      }
+      myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: chartData.labels,
+          datasets: [{
+            label: 'Calories',
+            data: chartData.values,
+            backgroundColor: '#4f46e5',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false } } }
+        }
+      });
     }
+
+    // --- SUBMIT FUNCTIONS ---
 
     async function submitManual() {
       const item = document.getElementById('mItem').value;
@@ -203,20 +205,19 @@
       const prot = document.getElementById('mProt').value;
       const cat = document.getElementById('mCategory').value;
 
-      if(!item || !cals) return alert("Fill in name and calories");
-
+      // Submit even if blank
       await fetch("/api/log/manual", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: currentUser, item, calories: cals, protein: prot, category: cat })
       });
-      
-      // Clear form
+
+      // Clear & Refresh
       document.getElementById('mItem').value = "";
       document.getElementById('mCals').value = "";
       document.getElementById('mProt').value = "";
       loadStats();
-      setMode('photo'); // Switch back to main view
+      setMode('photo');
     }
 
     async function submitWeight() {
@@ -227,8 +228,33 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: currentUser, weight: w })
       });
-      toggleWeightForm();
+      toggleWeight();
       loadStats();
+    }
+
+    async function uploadPhoto() {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) return;
+
+      const btn = document.getElementById('photoBtn');
+      const status = document.getElementById('status');
+      
+      btn.innerText = "Analyzing...";
+      status.innerText = "⏳ Sending to AI...";
+
+      const resizedBlob = await shrinkImage(file);
+      const formData = new FormData();
+      formData.append("image", resizedBlob);
+      formData.append("user", currentUser);
+
+      try {
+        const res = await fetch("/api/log/photo", { method: "POST", body: formData });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+        status.innerText = "✅ Added!";
+        loadStats();
+      } catch (e) { status.innerText = "❌ " + e.message; }
+      finally { btn.innerText = "Take Photo"; document.getElementById('fileInput').value = ""; }
     }
 
     function shrinkImage(file) {
