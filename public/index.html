@@ -117,7 +117,8 @@
     let comboChart = null;
 
     function init() { 
-      document.getElementById('mDate').valueAsDate = new Date();
+      // Initialize with Hawaii Time
+      updateDatePicker('Pacific/Honolulu');
       loadStats(); 
     }
 
@@ -126,7 +127,18 @@
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.getElementById(user === 'husband' ? 'tabHusband' : 'tabWife').classList.add('active');
       document.getElementById('goalDisplay').innerText = user === 'husband' ? '4000' : '2000';
+      
+      // Auto-switch Date Picker Timezone
+      const tz = user === 'husband' ? 'Pacific/Honolulu' : 'Asia/Tokyo';
+      updateDatePicker(tz);
+
       loadStats();
+    }
+
+    function updateDatePicker(timeZone) {
+      // Get the current date in the specific timezone
+      const dateStr = new Date().toLocaleDateString("en-CA", { timeZone: timeZone });
+      document.getElementById('mDate').value = dateStr;
     }
 
     function setMode(mode) {
@@ -168,18 +180,14 @@
       updateComboChart(data.chartData, data.weightHistory);
     }
 
-    // --- FIXED CHART LOGIC ---
     function updateComboChart(calsData, weightData) {
       const ctx = document.getElementById('comboChart').getContext('2d');
       if (comboChart) comboChart.destroy();
 
-      // Fix: Align dates manually (ignoring timezones) to ensure matching
-      // calsData.labels = ["Jan 1", "Jan 2", ...]
       const weightValues = calsData.labels.map(label => {
         const match = weightData.find(w => {
-           // w.x is "2026-01-26". We need to turn that into "Jan 26" to match the chart label
            const parts = w.x.split('-'); 
-           const d = new Date(parts[0], parts[1]-1, parts[2]); // Construct safe date
+           const d = new Date(parts[0], parts[1]-1, parts[2]); 
            const wLabel = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
            return wLabel === label;
         });
@@ -227,7 +235,7 @@
             y1: { 
               type: 'linear',
               position: 'right',
-              min: 130, // Optimized for your weight range
+              min: 90, // Adjusted lower bound for wife/husband range
               grid: { display: false }
             }
           }
@@ -248,7 +256,12 @@
       const date = document.getElementById('mDate').value;
       const item = "Manual " + cat;
       await fetch("/api/log/manual", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: currentUser, item, calories: cals, protein: prot, category: cat, date: date }) });
-      document.getElementById('mCals').value = ""; document.getElementById('mProt').value = ""; document.getElementById('mDate').valueAsDate = new Date();
+      document.getElementById('mCals').value = ""; document.getElementById('mProt').value = ""; 
+      
+      // Reset Date Picker to correct timezone
+      const tz = currentUser === 'husband' ? 'Pacific/Honolulu' : 'Asia/Tokyo';
+      updateDatePicker(tz);
+
       loadStats(); setMode('photo');
     }
 
