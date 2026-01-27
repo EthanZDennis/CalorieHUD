@@ -184,7 +184,12 @@
       return new Date().toLocaleDateString("en-CA", { timeZone: tz });
     }
 
-    // Updates BOTH date pickers (Food and Weight) to the correct timezone
+    // Returns a date label like "Jan 14" specific to the User's Timezone
+    function getDateLabel(dateObj) {
+      const tz = currentUser === 'husband' ? 'Pacific/Honolulu' : 'Asia/Tokyo';
+      return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: tz });
+    }
+
     function updateDatePicker(timeZone) {
       try {
         const dateStr = new Date().toLocaleDateString("en-CA", { timeZone: timeZone });
@@ -221,8 +226,10 @@
         renderGroupedHistory(data.recentLogs);
 
         if (typeof Chart !== 'undefined') {
+          // KEY CHANGE: Pass the raw logs to the chart renderer
+          // The chart will now calculate its own data from the exact same list you see below.
+          renderCalorieChart(data.recentLogs);
           renderWeightChart(data.weightHistory || []);
-          renderCalorieChart(data.chartData);
         }
       } catch (e) { console.error("Load Stats Error:", e); }
     }
@@ -274,10 +281,21 @@
         list.innerHTML = html;
     }
 
-    function renderCalorieChart(calsData) {
+    // --- REWRITTEN TO USE RAW LOGS (100% Accuracy) ---
+    function renderCalorieChart(logs) {
       const ctx = document.getElementById('calChart').getContext('2d');
       if (calChartInstance) calChartInstance.destroy();
 
+      // 1. Calculate Daily Totals from the Logs (Client Side)
+      const dailyTotals = {};
+      logs.forEach(l => {
+         const d = new Date(l.timestamp);
+         const key = getDateLabel(d); // e.g. "Jan 14" (Uses User Timezone!)
+         if (!dailyTotals[key]) dailyTotals[key] = 0;
+         dailyTotals[key] += parseInt(l.calories || 0);
+      });
+
+      // 2. Generate Last 30 Days Labels
       const labels = [];
       const values = [];
       const goalValue = GOALS[currentUser];
@@ -286,11 +304,11 @@
       for (let i = 29; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const label = getDateLabel(d); // "Jan 14"
         labels.push(label);
         
-        const index = calsData.labels.indexOf(label);
-        values.push(index > -1 ? calsData.values[index] : 0);
+        // 3. Match directly
+        values.push(dailyTotals[label] || 0);
         goalLine.push(goalValue);
       }
 
