@@ -127,17 +127,18 @@
         });
         calValues.push(daySum);
 
-        const weightMatch = (data.weightHistory || []).find(w => w.x.split(' ')[0] === isoDate);
-        if(weightMatch) weightPoints.push({ x: displayLabel, y: weightMatch.y });
-      }
+        // Inside renderCharts loop:
+// We use new Date() to ensure formats like "1/26/2026" match "2026-01-26"
+const weightMatch = (data.weightHistory || []).find(w => {
+    const sheetDate = new Date(w.x).toLocaleDateString("en-CA"); 
+    return sheetDate === isoDate;
+});
 
-      const ctxCal = document.getElementById('calChart').getContext('2d');
-      if(calChartInstance) calChartInstance.destroy();
-      calChartInstance = new Chart(ctxCal, {
-        type: 'bar',
-        data: { labels, datasets: [{ type: 'line', data: goalLine, borderColor: '#ef4444', borderDash:[5,5], pointRadius:0 }, { data: calValues, backgroundColor: '#6366f1', borderRadius: 6, barThickness: 35 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-      });
+if(weightMatch) {
+    // Ensure the value is treated as a number so the line can connect
+    weightPoints.push({ x: displayLabel, y: parseFloat(weightMatch.y) });
+}
+
 
       const ctxW = document.getElementById('weightChart').getContext('2d');
       if(weightChartInstance) weightChartInstance.destroy();
