@@ -138,15 +138,25 @@
           formData.append('photo', blob, 'shrunk.jpg');
           formData.append('user', currentUser);
           try {
-            const res = await fetch('/api/log/photo', { method: 'POST', body: formData });
-            const data = await res.json();
-            alert(`Logged: ${data.item} (${data.calories} kcal)`);
-            loadStats();
-          } catch (err) { alert("Photo failed."); } 
-          finally { btn.innerText = originalText; }
-        }, 'image/jpeg', 0.7);
-      };
+  const res = await fetch('/api/log/photo', { method: 'POST', body: formData });
+  const data = await res.json();
+  
+  // This fix ensures you see the name and calories instead of "undefined"
+  if (data && data.item && data.calories !== undefined) {
+    alert(`Logged: ${data.item} (${data.calories} kcal)`);
+    loadStats();
+  } else {
+    alert("AI was unsure. Please try a clearer photo.");
+  }
+} catch (err) { 
+  alert("Upload failed. Check your connection."); 
+         // This is the end of handlePhoto
+    } finally {
+      btn.innerText = originalText;
     }
+  }, 'image/jpeg', 0.7); // This closes the shrinking logic
+}; // This closes img.onload
+} // This closes the handlePhoto function   
 
     function renderCharts(data) {
       const labels = []; const calValues = []; const goalLine = [];
