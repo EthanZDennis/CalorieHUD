@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CalorieHUD</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  
   <style>
     :root { --primary: #4f46e5; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --danger: #ef4444; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; -webkit-tap-highlight-color: transparent; }
@@ -22,7 +24,10 @@
     .card-value { font-size: 24px; font-weight: 800; }
     .unit { font-size: 14px; color: #94a3b8; font-weight: 600; }
     
-    .chart-container { background: white; padding: 10px; border-radius: 20px; height: 260px; margin-bottom: 20px; position: relative; }
+    /* Charts */
+    .chart-wrapper { background: white; padding: 15px; border-radius: 20px; margin-bottom: 20px; }
+    .chart-container { height: 200px; position: relative; } /* Shorter height for weight */
+    .cal-chart-container { height: 240px; position: relative; }
 
     input, select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 16px; box-sizing: border-box; margin-bottom: 10px; }
     .btn { background: var(--primary); color: white; width: 100%; padding: 15px; border-radius: 14px; font-size: 16px; font-weight: 700; border: none; cursor: pointer; }
@@ -33,14 +38,14 @@
 
     .history-section { margin-top: 30px; }
     
-    /* --- NEW STYLES FOR DAILY GROUPS --- */
+    /* Daily Groups */
     .day-group { margin-bottom: 25px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background: white; }
     .day-header { 
       font-size: 15px; font-weight: 800; color: #334155; 
       display: flex; justify-content: space-between; align-items: center;
       background: #f1f5f9; padding: 12px 15px; 
     }
-    .day-total { font-size: 13px; background: white; padding: 4px 10px; border-radius: 8px; color: var(--primary); font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .day-total { font-size: 13px; background: white; padding: 4px 10px; border-radius: 8px; color: var(--primary); font-weight: 800; }
     .day-items { padding: 0 15px; }
     
     .history-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; align-items: center; }
@@ -80,6 +85,16 @@
     <button class="btn" onclick="submitWeight()">Update Weight</button>
   </div>
 
+  <div class="chart-wrapper">
+    <div class="card-label" style="margin-bottom:10px">Weight Trend 📉</div>
+    <div class="chart-container"><canvas id="weightChart"></canvas></div>
+  </div>
+
+  <div class="chart-wrapper">
+    <div class="card-label" style="margin-bottom:10px">30-Day Consistency 🔥</div>
+    <div class="cal-chart-container"><canvas id="calChart"></canvas></div>
+  </div>
+
   <div class="card" style="margin-bottom: 20px;">
     <div class="card-label">Consumed Today</div>
     <div class="card-value" style="color: var(--primary); margin-bottom: 10px;" id="consumedDisplay">0</div>
@@ -117,16 +132,14 @@
   </div>
 
   <div class="history-section">
-    <div class="card-label" style="margin-bottom: 10px;">30-Day Performance</div>
-    <div class="chart-container"><canvas id="comboChart"></canvas></div>
-
     <div class="card-label" style="margin-bottom: 10px;">History (Grouped by Day)</div>
     <div id="historyList"></div>
   </div>
 
   <script>
     let currentUser = 'husband';
-    let comboChart = null;
+    let weightChartInstance = null;
+    let calChartInstance = null;
 
     function init() { 
       updateDatePicker('Pacific/Honolulu');
@@ -171,16 +184,16 @@
         const pct = Math.min(100, (data.totalCals / goal) * 100);
         document.getElementById('progressBar').style.width = pct + '%';
 
-        // --- NEW: CALL THE GROUPED RENDERER ---
         renderGroupedHistory(data.recentLogs);
 
+        // Render Two Separate Charts
         if (typeof Chart !== 'undefined') {
-          updateComboChart(data.chartData, data.weightHistory || []);
+          renderWeightChart(data.weightHistory || []);
+          renderCalorieChart(data.chartData);
         }
       } catch (e) { console.error("Load Stats Error:", e); }
     }
 
-    // --- NEW LOGIC: GROUPS MEALS BY DAY ---
     function renderGroupedHistory(logs) {
         const list = document.getElementById('historyList');
         if (!logs || logs.length === 0) {
@@ -188,34 +201,20 @@
             return;
         }
 
-        // 1. Group items by Date String
         const groups = {};
         logs.forEach(l => {
             const d = new Date(l.timestamp);
-            const dateKey = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); // "Jan 26, 2026"
-            
-            if (!groups[dateKey]) {
-                groups[dateKey] = {
-                    dateObj: d, // Store actual date for sorting later
-                    total: 0,
-                    items: []
-                };
-            }
+            const dateKey = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            if (!groups[dateKey]) { groups[dateKey] = { dateObj: d, total: 0, items: [] }; }
             groups[dateKey].items.push(l);
             groups[dateKey].total += parseInt(l.calories || 0);
         });
 
-        // 2. Sort the Groups by Date (Newest First)
-        const sortedKeys = Object.keys(groups).sort((a, b) => {
-            return groups[b].dateObj - groups[a].dateObj;
-        });
+        const sortedKeys = Object.keys(groups).sort((a, b) => groups[b].dateObj - groups[a].dateObj);
 
-        // 3. Build the HTML
         let html = '';
         sortedKeys.forEach(key => {
             const group = groups[key];
-            
-            // The Header: Shows Date and TOTAL Calories
             html += `
             <div class="day-group">
                 <div class="day-header">
@@ -223,11 +222,7 @@
                     <span class="day-total">${group.total} cals</span>
                 </div>
                 <div class="day-items">`;
-
-            // The Items: Listed below the header
-            // (Sorting items newest-to-oldest within the day)
             group.items.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
-            
             group.items.forEach(l => {
                 html += `
                 <div class="history-item">
@@ -241,90 +236,107 @@
                     </div>
                 </div>`;
             });
-            
-            html += `</div></div>`; // Close group div
+            html += `</div></div>`;
         });
-
         list.innerHTML = html;
     }
 
-    function updateComboChart(calsData, weightData) {
-      const ctx = document.getElementById('comboChart').getContext('2d');
-      if (comboChart) comboChart.destroy();
+    // --- CHART 1: WEIGHT (Time Series) ---
+    function renderWeightChart(weightData) {
+      const ctx = document.getElementById('weightChart').getContext('2d');
+      if (weightChartInstance) weightChartInstance.destroy();
 
-      const labels = [];
-      const values = [];
-      const weights = [];
-      
-      for (let i = 29; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        d.setHours(12, 0, 0, 0); 
-        
-        const labelStr = d.toDateString(); 
-        const displayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        
-        labels.push(displayLabel);
-
-        const cIndex = calsData.labels.indexOf(displayLabel);
-        values.push(cIndex > -1 ? calsData.values[cIndex] : 0);
-
-        const weightMatch = weightData.find(w => {
-           if (!w.x) return false;
-           let wDate;
-           if (w.x.includes('/')) {
+      // Convert raw strings (2026-01-26 or 1/26/2026) into proper XY points
+      const points = weightData.map(w => {
+         let d;
+         if (w.x.includes('/')) {
              const p = w.x.split('/');
-             wDate = new Date(p[2], p[0]-1, p[1], 12, 0, 0, 0); 
-           } else {
+             d = new Date(p[2], p[0]-1, p[1]);
+         } else {
              const p = w.x.split('-');
-             wDate = new Date(p[0], p[1]-1, p[2], 12, 0, 0, 0);
-           }
-           return wDate.toDateString() === labelStr;
-        });
-        weights.push(weightMatch ? weightMatch.y : null);
-      }
+             d = new Date(p[0], p[1]-1, p[2]);
+         }
+         return { x: d, y: w.y };
+      }).sort((a, b) => a.x - b.x); // Ensure chronological order
 
-      comboChart = new Chart(ctx, {
-        type: 'bar',
+      weightChartInstance = new Chart(ctx, {
+        type: 'line',
         data: {
-          labels: labels,
-          datasets: [
-            {
-              type: 'line',
-              label: 'Weight',
-              data: weights,
-              borderColor: '#10b981',
-              backgroundColor: '#10b981',
-              borderWidth: 3,
-              pointRadius: 3,
-              spanGaps: true,
-              yAxisID: 'y1', 
-              tension: 0.2
-            },
-            {
-              type: 'bar',
-              label: 'Calories',
-              data: values,
-              backgroundColor: 'rgba(79, 70, 229, 0.6)',
-              borderRadius: 4,
-              yAxisID: 'y'
-            }
-          ]
+          datasets: [{
+            label: 'Weight (lbs)',
+            data: points,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 3,
+            pointRadius: 4,
+            pointBackgroundColor: '#fff',
+            pointBorderColor: '#10b981',
+            fill: true,
+            tension: 0.3
+          }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: true, position: 'bottom' } },
+          plugins: { legend: { display: false } },
           scales: {
-            x: { grid: { display: false }, ticks: { maxTicksLimit: 6, maxRotation: 0 } }, 
-            y: { beginAtZero: true, position: 'left', grid: { display: false } },
-            y1: { 
-              type: 'linear', position: 'right', grid: { display: false },
-              min: function(context) {
-                  const vals = context.chart.data.datasets[0].data.filter(v => v !== null);
-                  return vals.length > 0 ? Math.min(...vals) - 5 : 0;
+            x: { 
+              type: 'time', 
+              time: { unit: 'day', displayFormats: { day: 'MMM d' } },
+              grid: { display: false } 
+            },
+            y: { 
+              grid: { color: '#f1f5f9' },
+              // Smart Zoom: +5/-5 buffer around data
+              suggestedMin: (ctx) => {
+                 if(points.length === 0) return 0;
+                 return Math.min(...points.map(p => p.y)) - 5;
+              },
+              suggestedMax: (ctx) => {
+                 if(points.length === 0) return 200;
+                 return Math.max(...points.map(p => p.y)) + 5;
               }
             }
+          }
+        }
+      });
+    }
+
+    // --- CHART 2: CALORIES (30 Day Bar) ---
+    function renderCalorieChart(calsData) {
+      const ctx = document.getElementById('calChart').getContext('2d');
+      if (calChartInstance) calChartInstance.destroy();
+
+      // Create full 30 day labels
+      const labels = [];
+      const values = [];
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        labels.push(label);
+        const index = calsData.labels.indexOf(label);
+        values.push(index > -1 ? calsData.values[index] : 0);
+      }
+
+      calChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Calories',
+            data: values,
+            backgroundColor: 'rgba(79, 70, 229, 0.7)',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 6 } },
+            y: { grid: { display: false }, beginAtZero: true }
           }
         }
       });
