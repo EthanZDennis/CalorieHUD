@@ -6,7 +6,6 @@
   <title>CalorieHUD 2.0</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-  
   <style>
     :root { --primary: #6366f1; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --danger: #ef4444; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
@@ -27,7 +26,7 @@
     .btn { background: var(--primary); color: white; width: 100%; padding: 15px; border-radius: 14px; font-size: 16px; font-weight: 700; border: none; cursor: pointer; }
     .chart-wrapper { background: white; padding: 20px; border-radius: 24px; margin-bottom: 20px; box-shadow: 0 4px 20px -2px rgba(0,0,0,0.05); }
     .scroll-wrapper { overflow-x: auto; padding-bottom: 10px; -webkit-overflow-scrolling: touch; }
-    .wide-chart-body { height: 280px; width: 1500px; position: relative; }
+    .wide-chart-body { height: 280px; width: 1200px; position: relative; }
     .day-group { margin-bottom: 20px; border: 1px solid #f1f5f9; border-radius: 16px; overflow: hidden; background: white; }
     .day-header { font-size: 14px; font-weight: 700; background: #f8fafc; padding: 10px 15px; display: flex; justify-content: space-between; }
     .day-total { background: white; padding: 4px 8px; border-radius: 6px; color: var(--primary); font-weight: 700; border: 1px solid #e2e8f0; }
@@ -139,53 +138,28 @@
     }
 
     function renderCharts(data) {
-  const viewMode = document.getElementById('viewSelector').value;
-  const labels = []; const calValues = []; const weightPoints = []; const goalLine = [];
-  let start = new Date(); let iterations = 30;
-  
-  if(viewMode === 'rolling') start.setDate(start.getDate() - 29);
-  else { start = new Date(2026, 0, 1); iterations = 31; }
+      const viewMode = document.getElementById('viewSelector').value;
+      const labels = []; const calValues = []; const weightPoints = []; const goalLine = [];
+      let start = new Date(); let iterations = 30;
+      if(viewMode === 'rolling') start.setDate(start.getDate() - 29);
+      else { start = new Date(2026, 0, 1); iterations = 31; }
 
-  for(let i=0; i < iterations; i++) {
-    const d = new Date(start); d.setDate(d.getDate() + i);
-    const isoDate = d.toLocaleDateString("en-CA"); // YYYY-MM-DD
-    const displayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    
-    labels.push(displayLabel);
-    goalLine.push(GOALS[currentUser]);
+      for(let i=0; i < iterations; i++) {
+        const d = new Date(start); d.setDate(d.getDate() + i);
+        const isoDate = d.toLocaleDateString("en-CA");
+        const displayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        labels.push(displayLabel);
+        goalLine.push(GOALS[currentUser]);
 
-    // CALORIE FIX: Check for both YYYY-MM-DD and any other format in the labels
-    const cIdx = data.chartData.labels.findIndex(l => {
-        return l === isoDate || new Date(l).toLocaleDateString("en-CA") === isoDate;
-    });
-    calValues.push(cIdx > -1 ? data.chartData.values[cIdx] : 0);
+        const cIdx = data.chartData.labels.findIndex(l => l === isoDate || new Date(l).toLocaleDateString("en-CA") === isoDate);
+        calValues.push(cIdx > -1 ? data.chartData.values[cIdx] : 0);
 
-    // WEIGHT SYNC: Keep the fix that made the weight chart work
-    const weightMatch = (data.weightHistory || []).find(w => {
-        const cleanD = w.x.split(' ')[0];
-        return new Date(cleanD).toLocaleDateString("en-CA") === isoDate;
-    });
-    if(weightMatch) weightPoints.push({ x: displayLabel, y: weightMatch.y });
-  }
-
-  const ctxCal = document.getElementById('calChart').getContext('2d');
-  if(calChartInstance) calChartInstance.destroy();
-  calChartInstance = new Chart(ctxCal, {
-    type: 'bar',
-    data: { labels, datasets: [{ type: 'line', data: goalLine, borderColor: '#ef4444', borderDash:[5,5], pointRadius:0 }, { data: calValues, backgroundColor: '#6366f1', borderRadius: 6, barThickness: 35 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-  });
-
-  const ctxW = document.getElementById('weightChart').getContext('2d');
-  if(weightChartInstance) weightChartInstance.destroy();
-  weightChartInstance = new Chart(ctxW, {
-    type: 'line',
-    data: { labels, datasets: [{ data: labels.map(l => { const p = weightPoints.find(pt => pt.x === l); return p ? p.y : null; }), borderColor: '#10b981', spanGaps: true }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { suggestedMin: (ctx) => Math.min(...weightPoints.map(p=>p.y), 100)-5 }} }
-  });
-  document.getElementById('scrollContainer').scrollLeft = 9999;
-}
-
+        const weightMatch = (data.weightHistory || []).find(w => {
+            const cleanD = w.x.split(' ')[0];
+            return new Date(cleanD).toLocaleDateString("en-CA") === isoDate;
+        });
+        if(weightMatch) weightPoints.push({ x: displayLabel, y: weightMatch.y });
+      }
 
       const ctxCal = document.getElementById('calChart').getContext('2d');
       if(calChartInstance) calChartInstance.destroy();
