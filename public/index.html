@@ -97,7 +97,7 @@
       <input type="date" id="mDate">
       <select id="mCategory"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option><option>Protein Shake</option></select>
       <div class="grid"><input type="number" id="mCals" placeholder="Cals"><input type="number" id="mProt" placeholder="Prot"></div>
-      <button class="btn" onclick="submitManual()">Log Meal</button>
+      <button class="btn" id="logBtn" onclick="submitManual()">Log Meal</button>
     </div>
   </div>
 
@@ -220,8 +220,28 @@
     }
 
     async function submitManual() { 
-      const body = { user: currentUser, item: "Manual " + document.getElementById('mCategory').value, calories: document.getElementById('mCals').value, protein: document.getElementById('mProt').value, category: document.getElementById('mCategory').value, date: document.getElementById('mDate').value };
+      const btn = document.getElementById('logBtn');
+      btn.disabled = true;
+      btn.innerText = "Logging...";
+      
+      const body = { 
+        user: currentUser, 
+        item: "Manual " + document.getElementById('mCategory').value, 
+        calories: document.getElementById('mCals').value, 
+        protein: document.getElementById('mProt').value, 
+        category: document.getElementById('mCategory').value, 
+        date: document.getElementById('mDate').value 
+      };
+      
       await fetch("/api/log/manual", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      
+      // Reset Form & UI
+      document.getElementById('mCals').value = "";
+      document.getElementById('mProt').value = "";
+      btn.disabled = false;
+      btn.innerText = "Log Meal";
+      
+      setMode('photo'); // This auto-closes the manual area
       loadStats();
     }
 
@@ -242,7 +262,12 @@
 
     async function deleteLog(id) { if(confirm("Delete?")) { await fetch(`/api/log/${id}`, { method: 'DELETE', body: JSON.stringify({ user: currentUser }), headers: {'Content-Type':'application/json'} }); loadStats(); } }
     function toggleWeight() { document.getElementById('weightInputArea').classList.toggle('hidden'); }
-    function setMode(m) { document.getElementById('modePhoto').classList.toggle('hidden', m!=='photo'); document.getElementById('modeManual').classList.toggle('hidden', m!=='manual'); document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active')); event.target.classList.add('active'); }
+    function setMode(m) { 
+        document.getElementById('modePhoto').classList.toggle('hidden', m!=='photo'); 
+        document.getElementById('modeManual').classList.toggle('hidden', m!=='manual'); 
+        document.getElementById('btnModePhoto').classList.toggle('active', m==='photo');
+        document.getElementById('btnModeManual').classList.toggle('active', m==='manual');
+    }
   </script>
 </body>
 </html>
