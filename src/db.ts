@@ -1,3 +1,4 @@
+// src/db.ts
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 
@@ -15,14 +16,14 @@ export async function initDB() {
 
 export async function logMeal(user: string, data: any) {
   const sheet = doc.sheetsByTitle['Sheet1'];
-  // Forces "Day-Only" to fix the yesterday snack bug
+  // Keep the date-only fix to prevent the "yesterday snack" bug
   const dateOnly = data.date.split('T')[0]; 
   await sheet.addRow({
     Date: dateOnly,
     User: user,
     Item: data.item,
     Calories: data.calories,
-    Protein: data.protein || 0,
+    Protein: data.protein || 0, // Restores protein logging
     Category: data.category
   });
 }
@@ -31,7 +32,7 @@ export async function deleteLog(user: string, id: string) {
   const sheet = doc.sheetsByTitle['Sheet1'];
   const rows = await sheet.getRows();
   const row = rows.find(r => r.rowNumber === parseInt(id));
-  if (row) await row.delete();
+  if (row) await row.delete(); // Restores trash can functionality
 }
 
 export async function logWeight(user: string, weight: number, date: string) {
@@ -48,8 +49,9 @@ export async function getStats(user: string) {
   const userRows = rows1.filter(r => r.get('User').toLowerCase() === user.toLowerCase());
   const weightRows = rows2.filter(r => r.get('User').toLowerCase() === user.toLowerCase());
 
-  // Today's Date in your local timezone
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: user === 'husband' ? 'Pacific/Honolulu' : 'Asia/Tokyo' });
+  // Hard-lock today's date based on location to fix the "0 cals" bug
+  const tz = user.toLowerCase() === 'husband' ? 'Pacific/Honolulu' : 'Asia/Tokyo';
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: tz });
   
   const todayCals = userRows
     .filter(r => r.get('Date') === today)
