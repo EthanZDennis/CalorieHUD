@@ -74,11 +74,6 @@
     <div class="scroll-wrapper" id="scrollContainer"><div class="wide-chart-body"><canvas id="calChart"></canvas></div></div>
   </div>
 
-  <div class="chart-wrapper">
-    <div class="card-label" style="margin-bottom:15px">Weight Trend 📉</div>
-    <div style="height:200px"><canvas id="weightChart"></canvas></div>
-  </div>
-
   <div id="historyList"></div>
 
   <script>
@@ -117,24 +112,44 @@
       renderHistory(data.recentLogs);
     }
 
+    // Shrinking logic integrated into handlePhoto
     async function handlePhoto(input) {
       if (!input.files || !input.files[0]) return;
       const btn = document.getElementById('photoBtn');
       const originalText = btn.innerText;
-      btn.innerText = "⌛ Analyzing...";
-      const formData = new FormData();
-      formData.append('photo', input.files[0]);
-      formData.append('user', currentUser);
-      try {
-        const res = await fetch('/api/log/photo', { method: 'POST', body: formData });
-        const data = await res.json();
-        alert(`Logged: ${data.item} (${data.calories} kcal)`);
-        loadStats();
-      } catch (err) { alert("Photo upload failed."); } finally { btn.innerText = originalText; }
+      btn.innerText = "⌛ Shrinking...";
+
+      const file = input.files[0];
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const scale = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(async (blob) => {
+          btn.innerText = "⌛ Analyzing...";
+          const formData = new FormData();
+          formData.append('photo', blob, 'shrunk.jpg');
+          formData.append('user', currentUser);
+          try {
+            const res = await fetch('/api/log/photo', { method: 'POST', body: formData });
+            const data = await res.json();
+            alert(`Logged: ${data.item} (${data.calories} kcal)`);
+            loadStats();
+          } catch (err) { alert("Photo failed."); } 
+          finally { btn.innerText = originalText; }
+        }, 'image/jpeg', 0.7);
+      };
     }
 
     function renderCharts(data) {
-      const labels = []; const calValues = []; const weightPoints = []; const goalLine = [];
+      const labels = []; const calValues = []; const goalLine = [];
       const tz = currentUser === 'husband' ? 'Pacific/Honolulu' : 'Asia/Tokyo';
       let start = new Date(new Date().toLocaleString("en-US", {timeZone: tz}));
       start.setDate(start.getDate() - 29);
@@ -145,17 +160,11 @@
         const displayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         labels.push(displayLabel);
         goalLine.push(GOALS[currentUser]);
-
         let daySum = 0;
         data.chartData.labels.forEach((l, idx) => {
-          if (l === isoDate || new Date(l).toLocaleDateString("en-CA") === isoDate) {
-            daySum += data.chartData.values[idx];
-          }
+          if (l === isoDate || new Date(l).toLocaleDateString("en-CA") === isoDate) daySum += data.chartData.values[idx];
         });
         calValues.push(daySum);
-
-        const weightMatch = (data.weightHistory || []).find(w => new Date(w.x).toLocaleDateString("en-CA") === isoDate);
-        if(weightMatch) weightPoints.push({ x: displayLabel, y: parseFloat(weightMatch.y) });
       }
 
       const ctxCal = document.getElementById('calChart').getContext('2d');
@@ -164,14 +173,6 @@
         type: 'bar',
         data: { labels, datasets: [{ type: 'line', data: goalLine, borderColor: '#ef4444', borderDash:[5,5], pointRadius:0 }, { data: calValues, backgroundColor: '#6366f1', borderRadius: 6, barThickness: 35 }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-      });
-
-      const ctxW = document.getElementById('weightChart').getContext('2d');
-      if(weightChartInstance) weightChartInstance.destroy();
-      weightChartInstance = new Chart(ctxW, {
-        type: 'line',
-        data: { labels, datasets: [{ data: labels.map(l => (weightPoints.find(p=>p.x===l)||{}).y || null), borderColor: '#10b981', spanGaps: true }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { suggestedMin: 130 }} }
       });
       document.getElementById('scrollContainer').scrollLeft = 9999;
     }
@@ -187,7 +188,7 @@
         Object.keys(groups).sort((a,b)=>new Date(b)-new Date(a)).map(k => `
         <div style="margin-bottom:20px; border:1px solid #f1f5f9; border-radius:16px; overflow:hidden; background:white;">
           <div style="font-size:14px; font-weight:700; background:#f8fafc; padding:10px 15px; display:flex; justify-content:space-between;"><span>${k}</span><span style="color:var(--primary)">${groups[k].total} cals</span></div>
-          ${groups[k].items.map(i => `<div class="history-item"><div><b>${i.item}</b><br><small style="color:#64748b;">${i.category || 'Meal'}</small></div><div><b>${i.calories}</b> <span style="cursor:pointer;" onclick="deleteLog('${i.id}')">🗑️</span></div></div>`).join('')}
+          ${groups[k].items.map(i => `<div class="history-item"><div><b>${i.item}</b><br><small style="color:#64748b;">${i.category || 'Meal'}</small></div><div><b>${i.calories}</b> <span onclick="deleteLog('${i.id}')">🗑️</span></div></div>`).join('')}
         </div>
       `).join('');
     }
