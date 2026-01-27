@@ -4,53 +4,126 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CalorieHUD 2.0</title>
-  <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+    :root { --primary: #6366f1; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; }
+    body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+    .tabs { display: flex; gap: 8px; background: #e0e7ff; padding: 4px; border-radius: 12px; margin-bottom: 20px; }
+    .tab { flex: 1; text-align: center; padding: 10px; border-radius: 10px; font-weight: 700; color: #6366f1; cursor: pointer; }
+    .tab.active { background: white; color: #1e1b4b; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .card { background: var(--card); padding: 15px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .btn { background: var(--primary); color: white; width: 100%; padding: 15px; border-radius: 14px; font-weight: 700; border: none; cursor: pointer; }
+    .hidden { display: none; }
+    input, select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 10px; box-sizing: border-box; }
+    .wide-chart-body { height: 280px; width: 1200px; }
+    .scroll-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  </style>
 </head>
 <body onload="init()">
-  <div class="header"><div class="brand">CalorieHUD 2.0</div></div>
   <div class="tabs">
     <div id="tabHusband" class="tab active" onclick="setUser('husband')">🇺🇸 Husband</div>
     <div id="tabWife" class="tab" onclick="setUser('wife')">🇯🇵 Wife</div>
   </div>
 
-  <div class="progress-card">
-    <div class="card-label">Consumed Today 🍽️</div>
-    <div id="consumedDisplay" class="card-value">0</div>
-    <div style="background:#f1f5f9; height:10px; border-radius:5px; margin-top:10px; overflow:hidden;">
-      <div id="progressBar" style="width:0%; height:100%; background:var(--primary); transition: width 0.5s;"></div>
-    </div>
+  <div class="card">
+    <div style="font-size:11px; font-weight:700; color:#64748b">CONSUMED TODAY</div>
+    <div style="font-size:32px; font-weight:800; color:var(--primary)" id="consumedDisplay">0</div>
   </div>
 
-  <div class="grid">
-    <div class="card">
-      <div class="card-label">Goal 🎯</div>
-      <div id="goalDisplay" class="card-value">4000</div>
-    </div>
-    <div class="card" onclick="toggleWeight()">
-      <div class="card-label">Weight ✏️</div>
-      <div class="card-value"><span id="weightDisplay">--</span> lbs</div>
-    </div>
+  <div class="card" onclick="toggleWeight()">
+    <div style="font-size:11px; font-weight:700; color:#64748b">CURRENT WEIGHT</div>
+    <div style="font-size:24px; font-weight:800"><span id="weightDisplay">--</span> lbs</div>
   </div>
 
-  <div id="modeManual" class="hidden">
-    <div class="card">
-      <input type="date" id="mDate">
-      <select id="mCategory"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select>
-      <input type="number" id="mCals" placeholder="Calories">
-      <button class="btn" id="logBtn" onclick="submitManual()">Log Meal</button>
-    </div>
+  <div id="weightInputArea" class="card hidden">
+    <input type="date" id="weightDate">
+    <input type="number" id="newWeight" placeholder="Weight (lbs)">
+    <button class="btn" onclick="submitWeight()">Save Weight</button>
   </div>
 
-  <div class="chart-wrapper">
-    <select id="viewSelector" onchange="loadStats()"><option value="rolling">Last 30 Days</option><option value="0">January</option></select>
+  <div style="display:flex; gap:10px; margin-bottom:20px;">
+    <button class="btn" onclick="setMode('photo')">📸 Photo</button>
+    <button class="btn" onclick="setMode('manual')">✍️ Manual</button>
+  </div>
+
+  <div id="modeManual" class="card hidden">
+    <input type="date" id="mDate">
+    <select id="mCategory"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select>
+    <input type="number" id="mCals" placeholder="Calories">
+    <button class="btn" id="logBtn" onclick="submitManual()">Log Meal</button>
+  </div>
+
+  <div class="card">
     <div class="scroll-wrapper"><div class="wide-chart-body"><canvas id="calChart"></canvas></div></div>
   </div>
-  <div class="chart-wrapper"><div class="weight-chart-body"><canvas id="weightChart"></canvas></div></div>
+  <div class="card"><div style="height:200px"><canvas id="weightChart"></canvas></div></div>
 
   <div id="historyList"></div>
 
-  <script src="app.js"></script>
+  <script>
+    let currentUser = 'husband';
+    let weightChartInstance = null;
+    let calChartInstance = null;
+
+    function init() { setUser('husband'); }
+
+    function setUser(user) {
+      currentUser = user;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(user === 'husband' ? 'tabHusband' : 'tabWife').classList.add('active');
+      const tz = user === 'husband' ? 'Pacific/Honolulu' : 'Asia/Tokyo';
+      document.getElementById('mDate').value = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+      document.getElementById('weightDate').value = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+      loadStats();
+    }
+
+    async function loadStats() {
+      const res = await fetch(`/api/stats?user=${currentUser}`);
+      const data = await res.json();
+      document.getElementById('consumedDisplay').innerText = data.totalCals;
+      document.getElementById('weightDisplay').innerText = data.lastWeight || '--';
+      renderCharts(data);
+    }
+
+    function renderCharts(data) {
+      const ctxCal = document.getElementById('calChart').getContext('2d');
+      if(calChartInstance) calChartInstance.destroy();
+      calChartInstance = new Chart(ctxCal, {
+        type: 'bar',
+        data: { labels: data.chartData.labels.map(l => l.split('-').slice(1).join('/')), datasets: [{ data: data.chartData.values, backgroundColor: '#6366f1' }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
+
+      const weightData = (data.weightHistory || []).map(w => ({ x: w.x, y: parseFloat(w.y) }));
+      const ctxW = document.getElementById('weightChart').getContext('2d');
+      if(weightChartInstance) weightChartInstance.destroy();
+      weightChartInstance = new Chart(ctxW, {
+        type: 'line',
+        data: { datasets: [{ data: weightData, borderColor: '#10b981', tension: 0.3, spanGaps: true }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'day' } } }, plugins: { legend: { display: false } } }
+      });
+    }
+
+    async function submitManual() {
+      const btn = document.getElementById('logBtn');
+      btn.disabled = true;
+      const body = { user: currentUser, item: "Manual " + document.getElementById('mCategory').value, calories: document.getElementById('mCals').value, category: document.getElementById('mCategory').value, date: document.getElementById('mDate').value };
+      await fetch("/api/log/manual", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      btn.disabled = false;
+      document.getElementById('modeManual').classList.add('hidden'); // Auto-close
+      loadStats();
+    }
+
+    async function submitWeight() {
+      const w = document.getElementById('newWeight').value;
+      const d = document.getElementById('weightDate').value;
+      await fetch("/api/weight", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: currentUser, weight: w, date: d }) });
+      toggleWeight(); loadStats();
+    }
+
+    function toggleWeight() { document.getElementById('weightInputArea').classList.toggle('hidden'); }
+    function setMode(m) { document.getElementById('modeManual').classList.toggle('hidden', m!=='manual'); }
+  </script>
 </body>
 </html>
