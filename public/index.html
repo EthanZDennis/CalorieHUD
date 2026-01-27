@@ -35,7 +35,6 @@
   <div class="progress-card">
     <div class="card-label">Consumed Today 🍽️</div>
     <div class="card-value" style="color: var(--primary);" id="consumedDisplay">0</div>
-    
     <div style="margin-top: 15px;">
       <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #64748b; margin-bottom: 8px;">
         <span id="remainingDisplay">4000 kcal left</span>
@@ -52,7 +51,7 @@
     <div class="card" onclick="toggleWeight()"><div class="card-label">Weight ✏️</div><div class="card-value"><span id="weightDisplay">--</span> lbs</div></div>
   </div>
 
-  <div style="display:flex; gap:10px; margin-bottom:20px;">
+  <div style="display:flex; gap:10px; margin-top:20px; margin-bottom:20px;">
     <button class="btn" onclick="setMode('manual')">✍️ Manual</button>
     <button class="btn" style="background:#fff; color:var(--primary); border:1px solid var(--primary);">📸 Photo</button>
   </div>
@@ -64,9 +63,20 @@
   </div>
 
   <div class="chart-wrapper">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+      <span class="card-label">Daily Weight</span>
+      <select id="viewSelector" onchange="loadStats()" style="width:auto; margin:0; padding:5px; font-size:12px;">
+        <option value="rolling">Last 30 Days</option>
+        <option value="0">January</option>
+      </select>
+    </div>
     <div class="scroll-wrapper" id="scrollContainer"><div class="wide-chart-body"><canvas id="calChart"></canvas></div></div>
   </div>
-  <div class="chart-wrapper"><div style="height:200px"><canvas id="weightChart"></canvas></div></div>
+
+  <div class="chart-wrapper">
+    <div class="card-label" style="margin-bottom:15px">Weight Trend 📉</div>
+    <div style="height:200px"><canvas id="weightChart"></canvas></div>
+  </div>
 
   <div id="historyList"></div>
 
@@ -127,18 +137,17 @@
         });
         calValues.push(daySum);
 
-        // Inside renderCharts loop:
-// We use new Date() to ensure formats like "1/26/2026" match "2026-01-26"
-const weightMatch = (data.weightHistory || []).find(w => {
-    const sheetDate = new Date(w.x).toLocaleDateString("en-CA"); 
-    return sheetDate === isoDate;
-});
+        const weightMatch = (data.weightHistory || []).find(w => new Date(w.x).toLocaleDateString("en-CA") === isoDate);
+        if(weightMatch) weightPoints.push({ x: displayLabel, y: parseFloat(weightMatch.y) });
+      }
 
-if(weightMatch) {
-    // Ensure the value is treated as a number so the line can connect
-    weightPoints.push({ x: displayLabel, y: parseFloat(weightMatch.y) });
-}
-
+      const ctxCal = document.getElementById('calChart').getContext('2d');
+      if(calChartInstance) calChartInstance.destroy();
+      calChartInstance = new Chart(ctxCal, {
+        type: 'bar',
+        data: { labels, datasets: [{ type: 'line', data: goalLine, borderColor: '#ef4444', borderDash:[5,5], pointRadius:0 }, { data: calValues, backgroundColor: '#6366f1', borderRadius: 6, barThickness: 35 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
 
       const ctxW = document.getElementById('weightChart').getContext('2d');
       if(weightChartInstance) weightChartInstance.destroy();
@@ -151,38 +160,20 @@ if(weightMatch) {
     }
 
     function renderHistory(logs) {
-  const groups = {};
-  logs.forEach(l => {
-    const d = new Date(l.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    if(!groups[d]) groups[d] = { total: 0, items: [] };
-    groups[d].items.push(l); groups[d].total += parseInt(l.calories || 0);
-  });
-  
-  // Adding the "RECENT HISTORY" header back
-  let html = '<div class="card-label" style="margin: 20px 0 10px 5px;">RECENT HISTORY 📅</div>';
-  
-  html += Object.keys(groups).sort((a,b)=>new Date(b)-new Date(a)).map(k => `
-    <div class="day-group" style="margin-bottom:20px; border:1px solid #f1f5f9; border-radius:16px; overflow:hidden; background:white;">
-      <div class="day-header" style="font-size:14px; font-weight:700; background:#f8fafc; padding:10px 15px; display:flex; justify-content:space-between;">
-        <span>${k}</span><span style="color:var(--primary)">${groups[k].total} cals</span>
-      </div>
-      ${groups[k].items.map(i => `
-        <div class="history-item" style="display:flex; justify-content:space-between; padding:12px 15px; border-bottom:1px solid #f1f5f9;">
-          <div>
-            <div style="font-weight:700;">${i.item || 'Manual Entry'}</div>
-            <div style="font-size:12px; color:#64748b;">${i.category || 'Meal'}</div> </div>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <b style="font-size:16px;">${i.calories}</b>
-            <span style="cursor:pointer; opacity:0.3;" onclick="deleteLog('${i.id}')">🗑️</span>
-          </div>
+      const groups = {};
+      logs.forEach(l => {
+        const d = new Date(l.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        if(!groups[d]) groups[d] = { total: 0, items: [] };
+        groups[d].items.push(l); groups[d].total += parseInt(l.calories || 0);
+      });
+      document.getElementById('historyList').innerHTML = '<div class="card-label" style="margin: 20px 0 10px 5px;">RECENT HISTORY 📅</div>' + 
+        Object.keys(groups).sort((a,b)=>new Date(b)-new Date(a)).map(k => `
+        <div style="margin-bottom:20px; border:1px solid #f1f5f9; border-radius:16px; overflow:hidden; background:white;">
+          <div style="font-size:14px; font-weight:700; background:#f8fafc; padding:10px 15px; display:flex; justify-content:space-between;"><span>${k}</span><span style="color:var(--primary)">${groups[k].total} cals</span></div>
+          ${groups[k].items.map(i => `<div class="history-item"><div><b>${i.item}</b><br><small style="color:#64748b;">${i.category || 'Meal'}</small></div><div><b>${i.calories}</b> <span onclick="deleteLog('${i.id}')">🗑️</span></div></div>`).join('')}
         </div>
-      `).join('')}
-    </div>
-  `).join('');
-  
-  document.getElementById('historyList').innerHTML = html;
-}
-
+      `).join('');
+    }
 
     async function submitManual() {
       const body = { user: currentUser, item: "Manual Log", calories: document.getElementById('mCals').value, protein: document.getElementById('mProt').value, date: document.getElementById('mDate').value, category: "Manual" };
@@ -194,7 +185,7 @@ if(weightMatch) {
 
     async function deleteLog(id) { if(confirm("Delete?")) { await fetch(`/api/log/${id}`, { method: 'DELETE', body: JSON.stringify({ user: currentUser }), headers: {'Content-Type':'application/json'} }); loadStats(); } }
     function setMode(m) { document.getElementById('modeManual').classList.toggle('hidden', m!=='manual'); }
-    function toggleWeight() { /* weight logic */ }
+    function toggleWeight() { document.getElementById('modeManual').classList.remove('hidden'); document.getElementById('mCals').placeholder="Weight"; }
   </script>
 </body>
 </html>
