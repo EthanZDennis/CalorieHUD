@@ -1,1 +1,26 @@
+/* public/style.css */
+:root { --primary: #6366f1; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --danger: #ef4444; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+.tabs { display: flex; gap: 8px; background: #e0e7ff; padding: 4px; border-radius: 12px; margin-bottom: 20px; }
+.tab { flex: 1; text-align: center; padding: 10px; border-radius: 10px; font-weight: 600; color: #6366f1; cursor: pointer; }
+.tab.active { background: white; color: #1e1b4b; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.progress-card { background: var(--card); padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+.card { background: var(--card); padding: 15px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
+.card-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
+.card-value { font-size: 24px; font-weight: 800; }
+.mode-switch { display: flex; gap: 10px; margin-bottom: 20px; }
+.mode-btn { flex: 1; padding: 12px; border-radius: 14px; background: #fff; text-align: center; font-weight: 700; cursor: pointer; border: 2px solid transparent; }
+.mode-btn.active { border-color: var(--primary); color: var(--primary); background: #eef2ff; }
+input, select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 10px; box-sizing: border-box; }
+.btn { background: var(--primary); color: white; width: 100%; padding: 15px; border-radius: 14px; font-weight: 700; border: none; cursor: pointer; }
+.chart-wrapper { background: white; padding: 20px; border-radius: 24px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+.scroll-wrapper { overflow-x: auto; padding-bottom: 10px; }
+.wide-chart-body { height: 280px; width: 1500px; position: relative; }
+.weight-chart-body { height: 200px; position: relative; }
+.day-group { margin-bottom: 20px; border: 1px solid #f1f5f9; border-radius: 16px; overflow: hidden; background: white; }
+.day-header { font-size: 14px; font-weight: 700; background: #f8fafc; padding: 10px 15px; display: flex; justify-content: space-between; }
+.day-total { background: white; padding: 4px 8px; border-radius: 6px; color: var(--primary); border: 1px solid #e2e8f0; }
+.history-item { display: flex; justify-content: space-between; padding: 14px 15px; border-bottom: 1px solid #f1f5f9; align-items: center; }
+.hidden { display: none; }
 
