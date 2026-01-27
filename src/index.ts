@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
-import sharp from 'sharp'; 
+// Sharp import removed
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as db from './db';
 
@@ -16,23 +16,17 @@ app.post('/api/log/photo', upload.single('photo'), async (req: any, res: Respons
     const user = req.body.user;
     if (!req.file) return res.status(400).json({ error: "No photo" });
 
-    // 1. Sharp: High-clarity processing for your hardgainer logs
-    const optimizedBuffer = await sharp(req.file.buffer)
-      .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 90 })
-      .toBuffer();
-
-    // 2. VERIFIED MODEL: Using 2.5 Flash from your confirmed list
+    // Sharp processing block removed - using req.file.buffer directly
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const imageParts = [{
       inlineData: {
-        data: optimizedBuffer.toString("base64"),
+        // req.file.buffer now contains the 1200px image from your phone
+        data: req.file.buffer.toString("base64"),
         mimeType: "image/jpeg"
       },
     }];
 
-    // 3. Strict prompt to ensure conservative calorie counting
     const prompt = `Identify food. Estimate calories/protein. 
     User: Army hardgainer (142 lbs). Rule: Err on the LOWER side for calories. 
     Respond ONLY in raw JSON: {"item": "name", "calories": 0, "protein": 0}`;
@@ -40,7 +34,6 @@ app.post('/api/log/photo', upload.single('photo'), async (req: any, res: Respons
     const result = await model.generateContent([prompt, ...imageParts]);
     const response = await result.response;
     
-    // 4. JSON Filter: Prevents the "AI was unsure" crash
     const cleanJson = response.text().replace(/```json|```/g, "").trim();
     const data = JSON.parse(cleanJson);
 
@@ -55,7 +48,6 @@ app.post('/api/log/photo', upload.single('photo'), async (req: any, res: Respons
   }
 });
 
-// Helper routes
 app.get('/api/stats', async (req: Request, res: Response) => {
   const stats = await db.getStats(req.query.user as string);
   res.json(stats);
