@@ -8,12 +8,13 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   
   <style>
-    :root { --primary: #4f46e5; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --danger: #ef4444; }
+    :root { --primary: #6366f1; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --danger: #ef4444; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; -webkit-tap-highlight-color: transparent; }
     
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .brand { font-size: 24px; font-weight: 800; color: #1e1b4b; }
     
+    /* TABS & STATS */
     .tabs { display: flex; gap: 8px; background: #e0e7ff; padding: 4px; border-radius: 12px; margin-bottom: 20px; }
     .tab { flex: 1; text-align: center; padding: 10px; border-radius: 10px; font-weight: 600; color: #6366f1; cursor: pointer; transition: all 0.2s; }
     .tab.active { background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: #1e1b4b; }
@@ -24,39 +25,49 @@
     .card-value { font-size: 24px; font-weight: 800; }
     .unit { font-size: 14px; color: #94a3b8; font-weight: 600; }
     
-    /* Charts */
-    .chart-wrapper { background: white; padding: 15px; border-radius: 20px; margin-bottom: 20px; }
-    .chart-container { height: 200px; position: relative; } /* Shorter height for weight */
-    .cal-chart-container { height: 240px; position: relative; }
+    /* INPUT BUTTONS (Moved to Top) */
+    .mode-switch { display: flex; gap: 10px; margin-bottom: 20px; }
+    .mode-btn { flex: 1; padding: 12px; border-radius: 14px; background: #fff; text-align: center; font-weight: 700; font-size: 15px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.03); border: 2px solid transparent; transition: all 0.2s; }
+    .mode-btn.active { border-color: var(--primary); color: var(--primary); background: #eef2ff; }
 
     input, select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 16px; box-sizing: border-box; margin-bottom: 10px; }
     .btn { background: var(--primary); color: white; width: 100%; padding: 15px; border-radius: 14px; font-size: 16px; font-weight: 700; border: none; cursor: pointer; }
-    
-    .mode-switch { display: flex; gap: 10px; margin-bottom: 20px; }
-    .mode-btn { flex: 1; padding: 10px; border-radius: 10px; background: #f1f5f9; text-align: center; font-weight: 600; font-size: 14px; cursor: pointer; }
-    .mode-btn.active { background: #cbd5e1; color: #0f172a; }
 
-    .history-section { margin-top: 30px; }
+    /* CHARTS */
+    .chart-wrapper { background: white; padding: 20px; border-radius: 24px; margin-bottom: 20px; box-shadow: 0 4px 20px -2px rgba(0,0,0,0.05); }
     
-    /* Daily Groups */
-    .day-group { margin-bottom: 25px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background: white; }
-    .day-header { 
-      font-size: 15px; font-weight: 800; color: #334155; 
-      display: flex; justify-content: space-between; align-items: center;
-      background: #f1f5f9; padding: 12px 15px; 
+    /* SCROLLABLE CONTAINER */
+    .scroll-wrapper {
+      overflow-x: auto;
+      padding-bottom: 10px;
+      -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
     }
-    .day-total { font-size: 13px; background: white; padding: 4px 10px; border-radius: 8px; color: var(--primary); font-weight: 800; }
+    .wide-chart-body {
+      height: 280px;
+      width: 1500px; /* FORCE WIDE WIDTH -> MAKES BARS FAT */
+      position: relative;
+    }
+    .weight-chart-body { height: 200px; position: relative; }
+
+    /* HISTORY LIST */
+    .history-section { margin-top: 30px; }
+    .day-group { margin-bottom: 20px; border: 1px solid #f1f5f9; border-radius: 16px; overflow: hidden; background: white; }
+    .day-header { 
+      font-size: 14px; font-weight: 700; color: #475569; 
+      display: flex; justify-content: space-between; align-items: center;
+      background: #f8fafc; padding: 10px 15px; 
+    }
+    .day-total { font-size: 12px; background: white; padding: 4px 8px; border-radius: 6px; color: var(--primary); font-weight: 700; border: 1px solid #e2e8f0; }
     .day-items { padding: 0 15px; }
     
-    .history-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; align-items: center; }
+    .history-item { display: flex; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #f1f5f9; align-items: center; }
     .history-item:last-child { border-bottom: none; }
     .history-left { display: flex; flex-direction: column; }
-    .history-name { font-weight: 600; font-size: 15px; }
-    .history-meta { font-size: 12px; color: #64748b; }
-    .history-right { display: flex; align-items: center; gap: 10px; }
-    .cals-badge { font-weight: 600; color: #64748b; font-size: 14px; }
-    .delete-btn { color: #cbd5e1; cursor: pointer; padding: 8px; }
-    .delete-btn:hover { color: var(--danger); }
+    .history-name { font-weight: 600; font-size: 15px; color: #1e293b; }
+    .history-meta { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+    .history-right { display: flex; align-items: center; gap: 12px; }
+    .cals-badge { font-weight: 700; color: #1e293b; font-size: 15px; }
+    .delete-btn { color: #cbd5e1; cursor: pointer; padding: 5px; font-size: 18px; }
     .hidden { display: none; }
   </style>
 </head>
@@ -85,31 +96,13 @@
     <button class="btn" onclick="submitWeight()">Update Weight</button>
   </div>
 
-  <div class="chart-wrapper">
-    <div class="card-label" style="margin-bottom:10px">Weight Trend 📉</div>
-    <div class="chart-container"><canvas id="weightChart"></canvas></div>
-  </div>
-
-  <div class="chart-wrapper">
-    <div class="card-label" style="margin-bottom:10px">30-Day Consistency 🔥</div>
-    <div class="cal-chart-container"><canvas id="calChart"></canvas></div>
-  </div>
-
-  <div class="card" style="margin-bottom: 20px;">
-    <div class="card-label">Consumed Today</div>
-    <div class="card-value" style="color: var(--primary); margin-bottom: 10px;" id="consumedDisplay">0</div>
-    <div style="background:#f1f5f9; height:10px; border-radius:5px; overflow:hidden;">
-      <div id="progressBar" style="width:0%; height:100%; background:var(--primary); transition: width 0.5s;"></div>
-    </div>
-  </div>
-
   <div class="mode-switch">
     <div class="mode-btn active" onclick="setMode('photo')" id="btnModePhoto">📸 Photo</div>
     <div class="mode-btn" onclick="setMode('manual')" id="btnModeManual">✍️ Manual</div>
   </div>
 
   <div id="modePhoto">
-    <div class="card" style="text-align: center; padding: 30px;">
+    <div class="card" style="text-align: center; padding: 30px; margin-bottom: 20px;">
       <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="uploadPhoto()">
       <button class="btn" id="photoBtn" onclick="document.getElementById('fileInput').click()">Take Photo</button>
       <div id="status" style="margin-top:15px; font-size:14px; font-weight:600; color:#64748b">AI Ready</div>
@@ -117,7 +110,7 @@
   </div>
 
   <div id="modeManual" class="hidden">
-    <div class="card">
+    <div class="card" style="margin-bottom: 20px;">
       <div class="card-label">Log Past Meal?</div>
       <input type="date" id="mDate" style="margin-bottom: 15px;">
       <select id="mCategory">
@@ -131,8 +124,35 @@
     </div>
   </div>
 
+  <div class="chart-wrapper">
+    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+        <span class="card-label">Last 30 Days</span>
+        <span style="font-size:12px; color:#94a3b8">Swipe ↔️</span>
+    </div>
+    <div class="scroll-wrapper" id="scrollContainer">
+      <div class="wide-chart-body">
+        <canvas id="calChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-wrapper">
+    <div class="card-label" style="margin-bottom:15px">Weight Trend</div>
+    <div class="weight-chart-body">
+      <canvas id="weightChart"></canvas>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 20px;">
+    <div class="card-label">Consumed Today</div>
+    <div class="card-value" style="color: var(--primary); margin-bottom: 10px;" id="consumedDisplay">0</div>
+    <div style="background:#f1f5f9; height:10px; border-radius:5px; overflow:hidden;">
+      <div id="progressBar" style="width:0%; height:100%; background:var(--primary); transition: width 0.5s;"></div>
+    </div>
+  </div>
+
   <div class="history-section">
-    <div class="card-label" style="margin-bottom: 10px;">History (Grouped by Day)</div>
+    <div class="card-label" style="margin-bottom: 10px;">Recent History</div>
     <div id="historyList"></div>
   </div>
 
@@ -140,6 +160,7 @@
     let currentUser = 'husband';
     let weightChartInstance = null;
     let calChartInstance = null;
+    const GOALS = { husband: 4000, wife: 2000 };
 
     function init() { 
       updateDatePicker('Pacific/Honolulu');
@@ -150,7 +171,7 @@
       currentUser = user;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.getElementById(user === 'husband' ? 'tabHusband' : 'tabWife').classList.add('active');
-      document.getElementById('goalDisplay').innerText = user === 'husband' ? '4000' : '2000';
+      document.getElementById('goalDisplay').innerText = GOALS[user];
       const tz = user === 'husband' ? 'Pacific/Honolulu' : 'Asia/Tokyo';
       updateDatePicker(tz);
       loadStats();
@@ -186,7 +207,6 @@
 
         renderGroupedHistory(data.recentLogs);
 
-        // Render Two Separate Charts
         if (typeof Chart !== 'undefined') {
           renderWeightChart(data.weightHistory || []);
           renderCalorieChart(data.chartData);
@@ -218,8 +238,8 @@
             html += `
             <div class="day-group">
                 <div class="day-header">
-                    <span>📅 ${key}</span>
-                    <span class="day-total">${group.total} cals</span>
+                    <span>${key}</span>
+                    <span class="day-total">${group.total}</span>
                 </div>
                 <div class="day-items">`;
             group.items.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -232,7 +252,7 @@
                     </div>
                     <div class="history-right">
                         <div class="cals-badge">${l.calories}</div>
-                        <div class="delete-btn" onclick="deleteLog('${l.id}')">🗑️</div>
+                        <div class="delete-btn" onclick="deleteLog('${l.id}')">×</div>
                     </div>
                 </div>`;
             });
@@ -241,12 +261,84 @@
         list.innerHTML = html;
     }
 
-    // --- CHART 1: WEIGHT (Time Series) ---
+    // --- 1. SLIDER CALORIE CHART (With Dotted Goal Line) ---
+    function renderCalorieChart(calsData) {
+      const ctx = document.getElementById('calChart').getContext('2d');
+      if (calChartInstance) calChartInstance.destroy();
+
+      const labels = [];
+      const values = [];
+      const goalValue = GOALS[currentUser];
+      const goalLine = [];
+
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        // Clean label format "Jan 26"
+        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        labels.push(label);
+        
+        const index = calsData.labels.indexOf(label);
+        values.push(index > -1 ? calsData.values[index] : 0);
+        goalLine.push(goalValue);
+      }
+
+      calChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              // DOTTED GOAL LINE
+              type: 'line',
+              label: 'Goal',
+              data: goalLine,
+              borderColor: '#ef4444', 
+              borderWidth: 2,
+              borderDash: [6, 4], // Dotted Effect
+              pointRadius: 0,
+              order: 1
+            },
+            {
+              // FAT BARS
+              label: 'Calories',
+              data: values,
+              backgroundColor: '#6366f1',
+              borderRadius: 6,
+              barThickness: 35, // Thick bars
+              order: 2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } }, // Hide legend for cleaner look
+          scales: {
+            x: { 
+              grid: { display: false },
+              ticks: { font: { weight: 'bold' } } 
+            },
+            y: { 
+              grid: { borderDash: [4, 4], color: '#f1f5f9' }, 
+              beginAtZero: true 
+            }
+          }
+        }
+      });
+      
+      // Auto-scroll to the end (Most recent day)
+      setTimeout(() => {
+          const container = document.getElementById('scrollContainer');
+          container.scrollLeft = container.scrollWidth;
+      }, 100);
+    }
+
+    // --- 2. WEIGHT CHART ---
     function renderWeightChart(weightData) {
       const ctx = document.getElementById('weightChart').getContext('2d');
       if (weightChartInstance) weightChartInstance.destroy();
 
-      // Convert raw strings (2026-01-26 or 1/26/2026) into proper XY points
       const points = weightData.map(w => {
          let d;
          if (w.x.includes('/')) {
@@ -257,13 +349,13 @@
              d = new Date(p[0], p[1]-1, p[2]);
          }
          return { x: d, y: w.y };
-      }).sort((a, b) => a.x - b.x); // Ensure chronological order
+      }).sort((a, b) => a.x - b.x);
 
       weightChartInstance = new Chart(ctx, {
         type: 'line',
         data: {
           datasets: [{
-            label: 'Weight (lbs)',
+            label: 'Weight',
             data: points,
             borderColor: '#10b981',
             backgroundColor: 'rgba(16, 185, 129, 0.1)',
@@ -287,7 +379,6 @@
             },
             y: { 
               grid: { color: '#f1f5f9' },
-              // Smart Zoom: +5/-5 buffer around data
               suggestedMin: (ctx) => {
                  if(points.length === 0) return 0;
                  return Math.min(...points.map(p => p.y)) - 5;
@@ -297,46 +388,6 @@
                  return Math.max(...points.map(p => p.y)) + 5;
               }
             }
-          }
-        }
-      });
-    }
-
-    // --- CHART 2: CALORIES (30 Day Bar) ---
-    function renderCalorieChart(calsData) {
-      const ctx = document.getElementById('calChart').getContext('2d');
-      if (calChartInstance) calChartInstance.destroy();
-
-      // Create full 30 day labels
-      const labels = [];
-      const values = [];
-      for (let i = 29; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        labels.push(label);
-        const index = calsData.labels.indexOf(label);
-        values.push(index > -1 ? calsData.values[index] : 0);
-      }
-
-      calChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Calories',
-            data: values,
-            backgroundColor: 'rgba(79, 70, 229, 0.7)',
-            borderRadius: 4
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { grid: { display: false }, ticks: { maxTicksLimit: 6 } },
-            y: { grid: { display: false }, beginAtZero: true }
           }
         }
       });
