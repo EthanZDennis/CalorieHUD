@@ -21,7 +21,7 @@ app.post('/api/log/photo', upload.single('photo'), async (req: any, res: Respons
 
     const imageParts = [{
       inlineData: {
-        // req.file.buffer now contains the 1200px image from your phone
+        // req.file.buffer now contains the image from your phone
         data: req.file.buffer.toString("base64"),
         mimeType: "image/jpeg"
       },
@@ -35,9 +35,17 @@ app.post('/api/log/photo', upload.single('photo'), async (req: any, res: Respons
     
     const result = await model.generateContent([prompt, ...imageParts]);
     const response = await result.response;
+    const rawText = response.text();
+
+    // Surgical Fix: Use regex to find JSON brackets so extra AI text doesn't crash the app
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     
-    const cleanJson = response.text().replace(/```json|```/g, "").trim();
-    const data = JSON.parse(cleanJson);
+    if (!jsonMatch) {
+      // Surgical Fix: If no JSON, send the raw AI text to the UI as an error
+      return res.status(422).json({ error: rawText.trim() });
+    }
+
+    const data = JSON.parse(jsonMatch[0]);
 
     const tz = user === 'husband' ? 'Pacific/Honolulu' : 'Asia/Tokyo';
     const date = new Date().toLocaleDateString("en-CA", { timeZone: tz });
