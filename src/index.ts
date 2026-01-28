@@ -16,32 +16,30 @@ app.post('/api/log/photo', upload.single('photo'), async (req: any, res: Respons
     const user = req.body.user;
     if (!req.file) return res.status(400).json({ error: "No photo" });
 
-    // Sharp processing block removed - using req.file.buffer directly
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const imageParts = [{
       inlineData: {
-        // req.file.buffer now contains the image from your phone
         data: req.file.buffer.toString("base64"),
         mimeType: "image/jpeg"
       },
     }];
 
+    // Back to the three specific rules to ensure it sees the whole tray
     const prompt = `Identify food. Estimate calories/protein. 
-    User: Army hardgainer (142 lbs). Rule 1: Food will be touching or overlapping; guess the separate items anyway.
-    Rule 2: You MUST provide an estimate. Do not say you are unsure.
+    User: Army hardgainer (142 lbs). 
+    Rule 1: Food will be touching or overlapping; guess the separate items anyway.
+    Rule 2: You MUST provide an estimate for the WHOLE meal. Do not say you are unsure.
     Rule 3: Err on the LOWER side for calories. 
-    Respond ONLY in raw JSON: {"item": "name", "calories": 0, "protein": 0}`;
+    Respond ONLY in raw JSON: {"item": "name of all foods", "calories": 0, "protein": 0}`;
     
     const result = await model.generateContent([prompt, ...imageParts]);
     const response = await result.response;
     const rawText = response.text();
 
-    // Surgical Fix: Stop at the first closing bracket to prevent SyntaxErrors
     const jsonMatch = rawText.match(/\{[\s\S]*?\}/);
     
     if (!jsonMatch) {
-      // Surgical Fix: If no JSON, send the raw AI text to the UI as an error
       return res.status(422).json({ error: rawText.trim() });
     }
 
