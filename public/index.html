@@ -166,19 +166,13 @@
           };
 
           xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              const resp = JSON.parse(xhr.responseText);
-              if (resp.item) {
-                status.innerText = `✅ Logged: ${resp.item} (${resp.calories} kcal)`;
-                status.style.color = "#10b981";
-              } else {
-                status.innerText = "❌ AI failed. Separate food and use top-down angle.";
-                status.style.color = "#ef4444";
-                alert("The AI couldn't distinguish the items. Make sure your food isn't touching and use a direct top-down angle.");
-              }
+            const resp = JSON.parse(xhr.responseText);
+            if (xhr.status === 200 && resp.item) {
+              status.innerText = `✅ Logged: ${resp.item} (${resp.calories} kcal)`;
+              status.style.color = "#10b981";
               loadStats();
             } else {
-              status.innerText = `❌ Server Error: ${xhr.status}`;
+              status.innerText = `❌ ${resp.error || "Analysis failed"}`;
               status.style.color = "#ef4444";
             }
             btn.innerText = originalText;
