@@ -76,7 +76,13 @@ app.delete('/api/log/:id', async (req: Request, res: Response) => {
   res.sendStatus(200);
 });
 
-const PORT = process.env.PORT || 3000;
-db.initDB().then(() => {
-  app.listen(PORT, () => console.log(`🚀 Server live on port ${PORT}`));
-});
+// Export the app for Vercel (serverless)
+export default app;
+
+// Only listen if run directly (local dev or Render)
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  db.initDB().then(() => {
+    app.listen(PORT, () => console.log(`🚀 Server live on port ${PORT}`));
+  });
+}

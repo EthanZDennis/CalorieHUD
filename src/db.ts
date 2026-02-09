@@ -9,11 +9,17 @@ const serviceAccountAuth = new JWT({
 
 const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID!, serviceAccountAuth);
 
+let isInitialized = false;
+
 export async function initDB() {
-  await doc.loadInfo();
+  if (!isInitialized) {
+    await doc.loadInfo();
+    isInitialized = true;
+  }
 }
 
 export async function logMeal(user: string, data: any) {
+  await initDB();
   const sheet = doc.sheetsByTitle['Sheet1'];
   const dateOnly = data.date.split('T')[0]; 
   await sheet.addRow({
@@ -27,6 +33,7 @@ export async function logMeal(user: string, data: any) {
 }
 
 export async function deleteLog(user: string, id: string) {
+  await initDB();
   const sheet = doc.sheetsByTitle['Sheet1'];
   const rows = await sheet.getRows();
   const row = rows.find(r => r.rowNumber === parseInt(id));
@@ -34,12 +41,14 @@ export async function deleteLog(user: string, id: string) {
 }
 
 export async function logWeight(user: string, weight: number, date: string) {
+  await initDB();
   const sheet = doc.sheetsByTitle['Sheet2'];
   const dateOnly = date.split('T')[0];
   await sheet.addRow({ Date: dateOnly, User: user, Weight: weight });
 }
 
 export async function getStats(user: string) {
+  await initDB();
   const sheet1 = doc.sheetsByTitle['Sheet1'];
   const sheet2 = doc.sheetsByTitle['Sheet2'];
   const [rows1, rows2] = await Promise.all([sheet1.getRows(), sheet2.getRows()]);
