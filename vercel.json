@@ -8,8 +8,11 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/(.*)",
       "dest": "src/index.ts"
+    },
+    {
+      "handle": "filesystem"
     }
   ]
 }
