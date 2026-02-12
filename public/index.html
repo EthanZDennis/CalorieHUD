@@ -96,6 +96,12 @@
     let currentUser = 'husband';
     let weightChartInstance = null;
     let calChartInstance = null;
+    
+    // -- PAGINATION GLOBALS --
+    let historyPage = 0;
+    let cachedLogs = [];
+    const PAGE_SIZE = 7;
+    
     const GOALS = { husband: 4000, wife: 2000 };
 
     function init() { setUser('husband'); }
@@ -124,8 +130,83 @@
       document.getElementById('progressBar').style.width = pct + "%";
       document.getElementById('weightDisplay').innerText = data.lastWeight || '--';
       
+      // -- SAVE LOGS & RESET PAGE --
+      cachedLogs = data.recentLogs || [];
+      historyPage = 0;
+
       renderCharts(data);
-      renderHistory(data.recentLogs);
+      renderHistory(); // Render the first page
+    }
+
+    // -- PAGINATION RENDER FUNCTION --
+    function renderHistory() {
+      const logs = cachedLogs;
+      const groups = {};
+      
+      // 1. Group logs by date
+      logs.forEach(l => {
+        const d = new Date(l.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        if(!groups[d]) groups[d] = { total: 0, items: [] };
+        groups[d].items.push(l); 
+        groups[d].total += parseInt(l.calories || 0);
+      });
+
+      // 2. Sort dates descending
+      const allDates = Object.keys(groups).sort((a,b) => new Date(b) - new Date(a));
+      
+      // 3. Slice for current page
+      const start = historyPage * PAGE_SIZE;
+      const end = start + PAGE_SIZE;
+      const currentDates = allDates.slice(start, end);
+
+      // 4. Generate HTML
+      let html = '<div class="card-label" style="margin: 20px 0 10px 5px;">RECENT HISTORY 📅</div>';
+      
+      if (currentDates.length === 0) {
+        html += '<div style="text-align:center; padding:20px; color:#94a3b8;">No logs found.</div>';
+      } else {
+        html += currentDates.map(k => `
+          <div style="margin-bottom:20px; border:1px solid #f1f5f9; border-radius:16px; overflow:hidden; background:white;">
+            <div style="font-size:14px; font-weight:700; background:#f8fafc; padding:10px 15px; display:flex; justify-content:space-between;">
+              <span>${k}</span>
+              <span style="color:var(--primary)">${groups[k].total} cals</span>
+            </div>
+            ${groups[k].items.map(i => `
+              <div class="history-item">
+                <div><b>${i.item}</b><br><small style="color:#64748b;">${i.category || 'Meal'}</small></div>
+                <div><b>${i.calories}</b> <span style="cursor:pointer;" onclick="deleteLog('${i.id}')">🗑️</span></div>
+              </div>
+            `).join('')}
+          </div>
+        `).join('');
+      }
+
+      // 5. Add Buttons
+      const hasNext = end < allDates.length;
+      const hasPrev = historyPage > 0;
+
+      html += `
+        <div style="display:flex; gap:10px; margin-bottom:40px;">
+          <button class="btn" 
+            style="background:${hasPrev ? '#6366f1' : '#cbd5e1'}; cursor:${hasPrev ? 'pointer' : 'default'}" 
+            onclick="${hasPrev ? 'changePage(-1)' : ''}">
+            ◀ Newer
+          </button>
+          <button class="btn" 
+            style="background:${hasNext ? '#6366f1' : '#cbd5e1'}; cursor:${hasNext ? 'pointer' : 'default'}" 
+            onclick="${hasNext ? 'changePage(1)' : ''}">
+            Older ▶
+          </button>
+        </div>
+      `;
+
+      document.getElementById('historyList').innerHTML = html;
+    }
+
+    function changePage(delta) {
+      historyPage += delta;
+      renderHistory();
+      document.getElementById('historyList').scrollIntoView({ behavior: 'smooth' });
     }
 
     async function handlePhoto(input) {
@@ -235,22 +316,6 @@
       document.getElementById('scrollContainer').scrollLeft = 9999;
     }
 
-    function renderHistory(logs) {
-      const groups = {};
-      logs.forEach(l => {
-        const d = new Date(l.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        if(!groups[d]) groups[d] = { total: 0, items: [] };
-        groups[d].items.push(l); groups[d].total += parseInt(l.calories || 0);
-      });
-      document.getElementById('historyList').innerHTML = '<div class="card-label" style="margin: 20px 0 10px 5px;">RECENT HISTORY 📅</div>' + 
-        Object.keys(groups).sort((a,b)=>new Date(b)-new Date(a)).map(k => `
-        <div style="margin-bottom:20px; border:1px solid #f1f5f9; border-radius:16px; overflow:hidden; background:white;">
-          <div style="font-size:14px; font-weight:700; background:#f8fafc; padding:10px 15px; display:flex; justify-content:space-between;"><span>${k}</span><span style="color:var(--primary)">${groups[k].total} cals</span></div>
-          ${groups[k].items.map(i => `<div class="history-item"><div><b>${i.item}</b><br><small style="color:#64748b;">${i.category || 'Meal'}</small></div><div><b>${i.calories}</b> <span style="cursor:pointer;" onclick="deleteLog('${i.id}')">🗑️</span></div></div>`).join('')}
-        </div>
-      `).join('');
-    }
-
     async function submitWeight() {
       const weightVal = document.getElementById('wVal').value;
       const dateVal = document.getElementById('wDate').value;
@@ -278,7 +343,12 @@
       loadStats();
     }
 
-    async function deleteLog(id) { if(confirm("Delete?")) { await fetch(`/api/log/${id}`, { method: 'DELETE', body: JSON.stringify({ user: currentUser }), headers: {'Content-Type':'application/json'} }); loadStats(); } }
+    async function deleteLog(id) { 
+      if(confirm("Delete?")) { 
+        await fetch(`/api/log/${id}`, { method: 'DELETE', body: JSON.stringify({ user: currentUser }), headers: {'Content-Type':'application/json'} }); 
+        loadStats(); 
+      } 
+    }
     
     function setMode(m) { 
       document.getElementById('modeWeight').classList.add('hidden');
